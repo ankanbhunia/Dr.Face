@@ -27,6 +27,8 @@ import timeago, datetime
 import psutil
 from moviepy.editor import VideoFileClip, concatenate_videoclips
 import sys
+if IN_COLAB: PYTHON_PATH  = 'Library/bin/python' 
+else: PYTHON_PATH = 'python3.6'
 import queue
 import random
 import string
@@ -135,7 +137,7 @@ def exit_handler():
     #os.system('rm /tmp/model.txt')
     #print('\nCompleted.')
     
-    os.system('fuser -k /usr/bin/python3.6')
+    if not IN_COLAB: os.system('fuser -k /usr/bin/python3.6')
     
     
 
@@ -387,8 +389,8 @@ def Convert():
     if not os.path.isdir(datadir()+'/data_dst/merged'): os.mkdir(datadir()+'/data_dst/merged')
     if not os.path.isdir(datadir()+'/data_dst/merged_mask'): os.mkdir(datadir()+'/data_dst/merged_mask')
 
-    os.system('echo | python3.6 DeepFaceLab/main.py merge --input-dir '+datadir()+'/data_dst --output-dir '+datadir()+'/data_dst/merged --output-mask-dir '+datadir()+'/data_dst/merged_mask --aligned-dir '+datadir()+'/data_dst/aligned --model-dir '+datadir()+'/model --model SAEHD')
-    os.system('echo | python3.6 DeepFaceLab/main.py videoed video-from-sequence --input-dir '+datadir()+'/data_dst/merged --output-file '+datadir()+'/'+output_name+' --reference-file '+datadir()+'/data_dst.mp4 --include-audio')
+    os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py merge --input-dir '+datadir()+'/data_dst --output-dir '+datadir()+'/data_dst/merged --output-mask-dir '+datadir()+'/data_dst/merged_mask --aligned-dir '+datadir()+'/data_dst/aligned --model-dir '+datadir()+'/model --model SAEHD')
+    os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py videoed video-from-sequence --input-dir '+datadir()+'/data_dst/merged --output-file '+datadir()+'/'+output_name+' --reference-file '+datadir()+'/data_dst.mp4 --include-audio')
     os.system('cp '+datadir()+'/'+output_name+' /data')
     
     
@@ -417,8 +419,8 @@ def get_preview(thr):
             os.system('rm -r '+datadir()+'/preview/merged')
             os.mkdir(datadir()+'/preview/merged')
         
-            os.system("printf '0\nCPU\n' | python3.6 DeepFaceLab/main.py merge --input-dir "+datadir()+"/preview --output-dir "+datadir()+"/preview/merged --output-mask-dir "+datadir()+"/preview/merged_mask --aligned-dir "+datadir()+"/preview/aligned --model-dir "+datadir()+"/model --model SAEHD --cpu-only ")#> /dev/null 2>&1")
-            os.system("printf '10\n' | python3.6 DeepFaceLab/main.py videoed video-from-sequence_  --input-dir "+datadir()+"/preview/merged --output-file "+datadir()+"/result_preview.mp4 > /dev/null 2>&1")#> /dev/null 2>&1")
+            os.system("printf '0\nCPU\n' |  "+PYTHON_PATH+" DeepFaceLab/main.py merge --input-dir "+datadir()+"/preview --output-dir "+datadir()+"/preview/merged --output-mask-dir "+datadir()+"/preview/merged_mask --aligned-dir "+datadir()+"/preview/aligned --model-dir "+datadir()+"/model --model SAEHD --cpu-only ")#> /dev/null 2>&1")
+            os.system("printf '10\n' | "+PYTHON_PATH+" DeepFaceLab/main.py videoed video-from-sequence_  --input-dir "+datadir()+"/preview/merged --output-file "+datadir()+"/result_preview.mp4 > /dev/null 2>&1")#> /dev/null 2>&1")
             
             import moviepy.editor as mp
 
@@ -537,14 +539,14 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[4/12] Collecting frames from Source Videos')
             put_msg('[4/12] Collecting frames from Source Videos')
                 
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_src.* --output-dir "+datadir()+"/data_src/ ", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_src.* --output-dir "+datadir()+"/data_src/ ", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
             
             
                 
                 
             q.put  ('[5/12] Collecting frames from Target Videos')
             put_msg('[5/12] Collecting frames from Target Videos')
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_dst.* --output-dir "+datadir()+"/data_dst/", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_dst.* --output-dir "+datadir()+"/data_dst/", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
             
             if p!= 0: q.put('Error while extracting Target frames! '); return False
            
@@ -556,7 +558,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[6/12] Creating Source-face-profile')
             put_msg('[6/12] Creating Source-face-profile')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Source faces! '); return False
             
@@ -564,7 +566,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[7/12] Creating Target-face-profile')
             put_msg('[7/12] Creating Target-face-profile')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Target faces! '); return False
             
@@ -593,7 +595,7 @@ def Main(q, labelsdict, run, option_id):
                 
                     break
 
-            os.system('python3.6 DeepFaceLab/preview.py')
+            os.system(PYTHON_PATH+' DeepFaceLab/preview.py')
             
             
             
@@ -601,7 +603,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[9/12] Enhancing Source faces')
             put_msg('[9/12] Enhancing Source faces')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True).wait()
             
             if p!= 0: q.put('Error while enhancing Source faces! '); return False
             
@@ -609,7 +611,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[10/12] Enhancing Target faces')
             put_msg('[10/12] Enhancing Target faces')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True).wait()
             
             if p!= 0: q.put('Error while enhancing Target faces! '); return False
             
@@ -632,7 +634,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[11/12] Generating face segmentation masks')
             put_msg('[11/12] Generating face segmentation masks')
             
-            p = os.system('python3.6 face_seg.py')
+            p = os.system(PYTHON_PATH+' face_seg.py')
             if p != 0: 
                 q.put('Error while extracting face masks! ')
                 return False
@@ -659,7 +661,7 @@ def Main(q, labelsdict, run, option_id):
 		
 	    
              
-            p = os.system('echo | python3.6 DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
+            p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
             
             #print ("")
             
@@ -715,7 +717,7 @@ def Main(q, labelsdict, run, option_id):
     
             #print ('################################3')
                     
-            os.system('python3.6 DeepFaceLab/preview.py')
+            os.system(PYTHON_PATH+' DeepFaceLab/preview.py')
                     
             
             q.put('[2/2] Loading Workspace')
@@ -731,7 +733,7 @@ def Main(q, labelsdict, run, option_id):
             q.put('Training In Progress')
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
 
-            p = os.system('echo | python3.6 DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
+            p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
 
             q.put(':Stopped:')
                 
@@ -745,7 +747,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[2/10] Collecting frames from Source Videos')
             put_msg('[2/10] Collecting frames from Source Videos')
                 
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_src.* --output-dir "+datadir()+"/data_src/ ", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_src.* --output-dir "+datadir()+"/data_src/ ", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
             
             
                 
@@ -753,7 +755,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[3/10] Collecting frames from Target Videos')
             put_msg('[3/10] Collecting frames from Target Videos')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_dst.* --output-dir "+datadir()+"/data_dst/", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py videoed extract-video --input-file "+datadir()+"/data_dst.* --output-dir "+datadir()+"/data_dst/", shell=True,stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
             
             if p!= 0: q.put('Error while extracting Target frames! '); return False
            
@@ -765,7 +767,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[4/10] Creating Source-face-profile')
             put_msg('[4/10] Creating Source-face-profile')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Source faces! '); return False
             
@@ -773,7 +775,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[5/10] Creating Target-face-profile')
             put_msg('[5/10] Creating Target-face-profile')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Target faces! '); return False
             
@@ -802,7 +804,7 @@ def Main(q, labelsdict, run, option_id):
                 
                     break
 
-            os.system('python3.6 DeepFaceLab/preview.py')
+            os.system(PYTHON_PATH+' DeepFaceLab/preview.py')
             
             
             
@@ -810,7 +812,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[7/10] Enhancing Source faces')
             put_msg('[7/10] Enhancing Source faces')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True).wait()
             
             if p!= 0: q.put('Error while enhancing Source faces! '); return False
             
@@ -818,7 +820,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[8/10] Enhancing Target faces')
             put_msg('[8/10] Enhancing Target faces')
             
-            p = subprocess.Popen("echo | python3.6 DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True).wait()
+            p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True).wait()
             
             if p!= 0: q.put('Error while enhancing Target faces! '); return False
             
@@ -841,7 +843,7 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[9/10] Generating face segmentation masks')
             put_msg('[9/10] Generating face segmentation masks')
             
-            p = os.system('python3.6 face_seg.py')
+            p = os.system(PYTHON_PATH+' face_seg.py')
             if p != 0: 
                 q.put('Error while extracting face masks! ')
                 return False
@@ -866,7 +868,7 @@ def Main(q, labelsdict, run, option_id):
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
 
              
-            p = os.system('echo | python3.6 DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
+            p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
             
             #print ("")
             
