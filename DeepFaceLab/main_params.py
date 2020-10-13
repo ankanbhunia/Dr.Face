@@ -1,0 +1,5 @@
+Batch_size = '8' # ['Auto' or specify]
+Device = 'GPU' #['CPU', 'GPU']
+Device_Id = '0' #[Specify GPU ID, ie '0' or '0,1']
+Face_Resolution = 64 #[64-640] 
+Output_image_Resolution = 128  #[256,2048]
