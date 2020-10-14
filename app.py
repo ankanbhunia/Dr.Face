@@ -27,6 +27,7 @@ import timeago, datetime
 import psutil
 from moviepy.editor import VideoFileClip, concatenate_videoclips
 import sys
+IN_COLAB = 'COLAB_GPU' in os.environ
 if IN_COLAB: PYTHON_PATH  = 'Library/bin/python' 
 else: PYTHON_PATH = 'python3.6'
 import queue
@@ -98,6 +99,8 @@ if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaus
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
+drive_path = 'drive/My Drive/'
+if not os.path.isdir(os.path.join(drive_path, 'Dr.Face')):os.mkdir(os.path.join(drive_path, 'Dr.Face'))
 
 
 def kill_pythons():
@@ -141,7 +144,7 @@ def exit_handler():
     
     
 
-atexit.register(exit_handler)
+if not IN_COLAB: atexit.register(exit_handler)
 
 
 class merging_vars:
@@ -399,6 +402,33 @@ def Convert():
     
     ###########print ('###############################' + 'convertion done')
     
+
+def save_workspace_data():
+
+    while 1:
+
+      time.sleep(3600*2)
+      f = open('/tmp/model.txt','r')
+      convert_id = f.read()
+      f.close()
+      #print ('jjkdhsjksjkdkdkdkdkldkdkdkdlld#@@@@@@@@@@@@@@@@@' + convert_id)
+      print ('zip -r -q '+convert_id+'.zip '+datadir())
+      os.system('zip -r -q '+convert_id+'.zip '+datadir()); 
+      copyfile(convert_id+'.zip', os.path.join(drive_path, 'Dr.Face', convert_id+'.zip'))
+      ##########print ('###############################' + 'save_workspace_data')
+
+def save_workspace_model():
+
+  while 1:
+
+    time.sleep(3600*2)
+    #print ('jjkdhsjksjkdkdkdkdkldkdkdkdlld###############' + convert_id)
+    
+    
+    f = open('/tmp/model.txt','r')
+    convert_id = f.read()
+    f.close()
+    os.system('zip -ur workspace_'+convert_id+'.zip workspace/model'); os.system('cp workspace_'+convert_id+'.zip '+drive_path)
     
     
 def get_preview(thr):
@@ -3457,7 +3487,15 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
        #global thread_list
         thread_list.append(thr3)
         
-
+        if IN_COLAB:
+        
+            thr2 = Process(target = save_workspace_data, args=())
+            thr2.daemon = True
+            thr2.start()
+           #global thread_list
+            thread_list.append(thr2)
+        
+        
         #threading.Thread(target=Main, args=(gui_queue,), daemon=True).start()
         
                 
@@ -4340,6 +4378,6 @@ def update__(nd, interval):
     
 if __name__ == '__main__':
     
-	app.run_server(debug=False, port =  8080, host = '0.0.0.0')
+	app.run_server(debug=False, port =  8000, host = '0.0.0.0')
 
 #gunicorn app:server -b 0.0.0.0:8080
