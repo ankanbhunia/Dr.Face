@@ -1297,8 +1297,8 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
         
         
         dbc.Modal(    
-            [  
-                dbc.ModalHeader("Obtaining Final Output"),
+            [   
+                dbc.ModalHeader('In Progress', id = 'ModalHeader_convert'),
                 dbc.ModalBody([html.Div(id = 'convert_result'),
                                 html.Br(),
                                 dbc.Progress(id = 'merge_progress')]),
@@ -1715,7 +1715,7 @@ html.Div(id = 'okay_face_select_text')])
 controls_start = dbc.Jumbotron(
     [
         html.H1("Start the Process", id  = 'status'),
-    dbc.Tooltip('Description' ,id = 'status_tooltip',
+    dbc.Tooltip( id = 'status_tooltip',
             target="status",
             placement = 'left'
         ),
@@ -2613,6 +2613,9 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     ##########print (pids)
     killall()
     for filename in glob.glob("/tmp/*npy"):os.remove(filename)
+    if os.path.isdir(datadir()+'/data_dst/merged'):
+        shutil.rmtree(datadir()+'/data_dst/merged')
+        os.mkdir (datadir()+'/data_dst/merged')
     #shutdown() 
     if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
     time.sleep(1)
@@ -4399,14 +4402,15 @@ def update__(interval):
     
         return [dash.no_update,dash.no_update,dash.no_update]
             
-@app.callback([Output('merge_progress', 'value'),Output('convert_result', 'children'), Output('merge_progress_modal', 'is_open'),Output('merge_progress_exit', 'style'), ],
+@app.callback([Output('merge_progress', 'value'),Output('convert_result', 'children'), Output('merge_progress_modal', 'is_open'),Output('merge_progress_exit', 'style'),Output('ModalHeader_convert', 'children') ],
         [Input('convert_start', 'n_clicks'), Input('merge_progress_exit', 'n_clicks'), Input('interval-1', 'n_intervals')])
         
   
 def update__(nd,ne, interval):
 
     trigger_id = dash.callback_context.triggered[0]['prop_id']
-    #merge_progress_modal = dash.no_update
+    ModalHeader_convert = dash.no_update
+    merge_progress_modal = dash.no_update
     global cfg_merge 
     #done = 0
     #global convert_id
@@ -4421,13 +4425,14 @@ def update__(nd,ne, interval):
     if ne and trigger_id=='merge_progress_exit.n_clicks':
         
         os.remove('/tmp/converting')
-        #return dash.no_update, dash.no_update, False,dash.no_update
+        merge_progress_modal = False
+        return dash.no_update, dash.no_update, merge_progress_modal,dash.no_update, ModalHeader_convert
          
     
     if nd and trigger_id=='convert_start.n_clicks':
     
         open('/tmp/converting','w+').close()
-    
+        #ModalHeader_convert = html.Div([dbc.Badge([ dbc.Spinner(size="lg", color = 'danger'), ' Swaping: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
         killall()
         ##print ('gb')
         
@@ -4486,7 +4491,7 @@ def update__(nd,ne, interval):
         thr.start()
         merge_progress_modal = True
         
-        return 0, ["Converting frames ", dbc.Spinner(size="sm")]   , merge_progress_modal, {'display':'none'}
+        return 0, ["[1/2] Loading frames ", ]   , merge_progress_modal, {'display':'none'}, ModalHeader_convert
     
     if nd and trigger_id=='interval-1.n_intervals':
     
@@ -4510,27 +4515,28 @@ def update__(nd,ne, interval):
                 done = 100
 
                 
-                done_ = [html.Br(), "Completed. [Goto path "+tar_di+' to play it]']
+                done_ = [html.Br(),"Goto path "+tar_di+' to play it']
                 
                 sty = {'display':''}
+                ModalHeader_convert = 'Completed'
        
             
             else:
-                done_ =  [ "Converting frames ", dbc.Spinner(size="sm")]   
+                done_ =  [ "[2/2] Swaping faces "]   
                 sty =  {'display':'none'}
                 
             
-            merge_progress_modal = os.path.isfile('/tmp/converting')
+            #merge_progress_modal = os.path.isfile('/tmp/converting')
             
             
-            return done,done_, merge_progress_modal, sty
+            return done,done_, merge_progress_modal, sty, ModalHeader_convert
             
         except:
             pass
             
-    merge_progress_modal = os.path.isfile('/tmp/converting')
+    #merge_progress_modal = os.path.isfile('/tmp/converting')
     
-    return 0, "", merge_progress_modal, {'display':'none'}
+    return 0, "", merge_progress_modal, {'display':'none'}, ModalHeader_convert
     
     
 if __name__ == '__main__':
