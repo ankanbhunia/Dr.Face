@@ -16,8 +16,10 @@ def datadir():
      f = open('/tmp/model.txt','r')
      n = f.read()
      return os.path.join('/data', n)
+import tensorflow as tf
 
-
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.90)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
 def trainerThread (s2c, c2s, e,
                     model_class_name = None,

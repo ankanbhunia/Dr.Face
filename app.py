@@ -1,4 +1,3 @@
-#print ('sssss')
 from importlib import reload  
 
 import zipfile
@@ -59,7 +58,7 @@ global Progress_modal_is_open
 Progress_modal_is_open = True
 import sys  
 sys.path.append('DeepFaceLab')
-
+counter_children = 0
 import numpy as np
 from facelib import FaceType
 global labelsdict
@@ -68,9 +67,7 @@ global no_loop
 no_loop = False
 run = Value("i", 0)
 manager = Manager()
-labelsdict = manager.dict()
-labelsdict['src_face_labels'] = {}
-labelsdict['dst_face_labels'] = {}
+
 global total_src_frames
 global total_src_frames_paths
 total_src_frames = 0
@@ -91,38 +88,58 @@ import dash_player
 import argparse
 from random import *
 
+if not os.path.isdir('/data'): os.mkdir('/data')
+
 import atexit
 if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
 if os.path.isfile('/tmp/processing'): os.remove('/tmp/processing')
 if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaustedError')
+if os.path.isfile('/tmp/converting'): os.remove('/tmp/converting')
 
+if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
-drive_path = 'drive/My Drive/'
-if not os.path.isdir(os.path.join(drive_path, 'Dr.Face')):os.mkdir(os.path.join(drive_path, 'Dr.Face'))
+
+parser = argparse.ArgumentParser(description='FakeLab Options')
+
+parser.add_argument('drivepath', type=str, nargs='?',
+                    help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
+
+
+
+argss = parser.parse_args()
+if argss.drivepath == None:
+    argss.drivepath = 'drive/My Drive/'
+drive_path = argss.drivepath
+
+IN_COLAB_DRIVE = IN_COLAB and os.path.isdir(drive_path)
+
+
+if os.path.isdir(drive_path):
+  if not os.path.isdir(os.path.join(drive_path, 'Dr.Face')):os.mkdir(os.path.join(drive_path, 'Dr.Face'))
 
 
 def kill_pythons():
 
-	import psutil
-	import os
+    import psutil
+    import os
 
-	for proc in psutil.process_iter():
-		pinfo = proc.as_dict(attrs=['pid', 'name'])
-		procname = str(pinfo['name'])
-		procpid = str(pinfo['pid'])
-		if "python" in procname and procpid != str(os.getpid()):
+    for proc in psutil.process_iter():
+        pinfo = proc.as_dict(attrs=['pid', 'name'])
+        procname = str(pinfo['name'])
+        procpid = str(pinfo['pid'])
+        if "python" in procname and procpid != str(os.getpid()):
 
-			#print("Stopped Python Process ", proc)
-			proc.kill()
+            #print("Stopped Python Process ", proc)
+            proc.kill()
 
 def killall():
 
-	
+    
 
 
-	os.system('fuser -k /dev/nvidia-uvm > /dev/null 2>&1')
+    os.system('fuser -k /dev/nvidia-uvm > /dev/null 2>&1')
     
           
 killall()
@@ -131,6 +148,7 @@ def exit_handler():
     
     #print ('\nexiting program.... ')
 
+    killall()
     killall()
     kill_pythons()
     
@@ -394,7 +412,7 @@ def Convert():
 
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py merge --input-dir '+datadir()+'/data_dst --output-dir '+datadir()+'/data_dst/merged --output-mask-dir '+datadir()+'/data_dst/merged_mask --aligned-dir '+datadir()+'/data_dst/aligned --model-dir '+datadir()+'/model --model SAEHD')
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py videoed video-from-sequence --input-dir '+datadir()+'/data_dst/merged --output-file '+datadir()+'/'+output_name+' --reference-file '+datadir()+'/data_dst.mp4 --include-audio')
-    os.system('cp '+datadir()+'/'+output_name+' /data')
+    #os.system('cp '+datadir()+'/'+output_name+' /data')
     
     
     for filename in glob.glob("/tmp/*npy"):os.remove(filename)
@@ -405,17 +423,22 @@ def Convert():
 
 def save_workspace_data():
 
-    while 1:
+    time.sleep(3600)
 
-      time.sleep(3600*2)
+    while 1:
+       
+      
       f = open('/tmp/model.txt','r')
       convert_id = f.read()
       f.close()
+      #print (convert_id)
       #print ('jjkdhsjksjkdkdkdkdkldkdkdkdlld#@@@@@@@@@@@@@@@@@' + convert_id)
-      print ('zip -r -q '+convert_id+'.zip '+datadir())
+      #print ('zip -r -q '+convert_id+'.zip '+datadir())
       os.system('zip -r -q '+convert_id+'.zip '+datadir()); 
       copyfile(convert_id+'.zip', os.path.join(drive_path, 'Dr.Face', convert_id+'.zip'))
+      os.system('rm '+convert_id+'.zip')
       ##########print ('###############################' + 'save_workspace_data')
+      time.sleep(3600)
 
 def save_workspace_model():
 
@@ -476,12 +499,12 @@ def get_preview(thr):
             time.sleep(60)
             
 def put_msg(msg):
-	#print (os.listdir('/tmp'))
-	f = open('/tmp/processing','w+')
-	f.write(msg)
-	f.close()
+    #print (os.listdir('/tmp'))
+    f = open('/tmp/processing','w+')
+    f.write(msg)
+    f.close()
 
-def Main(q, labelsdict, run, option_id):
+def Main(q, option_id):
     
     ###########print ('############')
     ###########print (mode)
@@ -490,7 +513,7 @@ def Main(q, labelsdict, run, option_id):
     files.sort(key=lambda x: os.path.getmtime('/data/'+x))
     option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
     for j,idx in enumerate(files[::-1]):
-    	option_.append({"label": idx , "value" : j+2})
+        option_.append({"label": idx , "value" : j+2})
   
     option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
     import os
@@ -498,7 +521,7 @@ def Main(q, labelsdict, run, option_id):
     import time
     ###########print (option_)
     
-    ##print (option_id)	
+    ##print (option_id)    
     ##print (option_)
     model = [i['label'] for i in option_ if i['value'] == int(option_id)][0]
     
@@ -537,33 +560,22 @@ def Main(q, labelsdict, run, option_id):
             q.put  ('[2/12] Merging Source Videos')
             put_msg('[2/12] Merging Source Videos')
         
-            try:
             
-                source_files_merge = concatenate_videoclips(src_vids_clip)
+            source_files_merge = concatenate_videoclips(src_vids_clip)
 
-                source_files_merge.write_videofile(datadir()+'/data_src.mp4',) 
+            source_files_merge.write_videofile(datadir()+'/data_src.mp4',) 
                 
-            except:
             
-                q.put('Error during merging source videos! ')
-                
-                return False
                 
 
             q.put  ('[3/12] Merging Target Videos')
             put_msg('[3/12] Merging Target Videos')
             
-            try:
 
-                target_files_merge = concatenate_videoclips(tar_vids_clip)
+            target_files_merge = concatenate_videoclips(tar_vids_clip)
 
-                target_files_merge.write_videofile(datadir()+'/data_dst.mp4',) 
-                
-            except:
-            
-                q.put('Error during merging target videos! ')
-                
-                return False
+            target_files_merge.write_videofile(datadir()+'/data_dst.mp4',) 
+        
                 
           
             q.put  ('[4/12] Collecting frames from Source Videos')
@@ -604,20 +616,28 @@ def Main(q, labelsdict, run, option_id):
             put_msg('[8/12] Analyzing collected faces')
             
             print ('Analyzing source faces')
+            
+            os.mkdir('/tmp/cluster')
+            labelsdict = {}
+            labelsdict['src_face_labels'] = {}
+            labelsdict['dst_face_labels'] = {}
+            
             labelsdict['src_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_src/aligned')
             print ('Analyzing target faces')
             labelsdict['dst_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_dst/aligned')
+            
+            np.save('/tmp/cluster/labelsdict.npy', labelsdict) 
             
             from numba import cuda 
             device = cuda.get_current_device()
             device.reset()
             
-            run.value = 1
+            #run.value = 1
             
             
             while True:
             
-                if run.value:
+                if os.path.isdir('/tmp/cluster'):
                 
                     time.sleep(4)
                     
@@ -688,8 +708,8 @@ def Main(q, labelsdict, run, option_id):
             q.put('Training In Progress')
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
             
-		
-	    
+        
+        
              
             p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
             
@@ -813,20 +833,27 @@ def Main(q, labelsdict, run, option_id):
             put_msg('[6/10] Analyzing collected faces')
             
             print ('Analyzing source faces')
+            os.mkdir('/tmp/cluster')
+            labelsdict = {}
+            labelsdict['src_face_labels'] = {}
+            labelsdict['dst_face_labels'] = {}
+            
             labelsdict['src_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_src/aligned')
             print ('Analyzing target faces')
             labelsdict['dst_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_dst/aligned')
+            
+            np.save('/tmp/cluster/labelsdict.npy', labelsdict) 
             
             from numba import cuda 
             device = cuda.get_current_device()
             device.reset()
             
-            run.value = 1
+            #run.value = 1
             
             
             while True:
             
-                if run.value:
+                if os.path.isdir('/tmp/cluster'):
                 
                     time.sleep(4)
                     
@@ -910,11 +937,11 @@ def Main(q, labelsdict, run, option_id):
         else:
         
             q.put(':Stopped:')
-            return False		
+            return False        
             
             
         
-      	
+          
             
 
 import os
@@ -1010,7 +1037,7 @@ record = [html.Div(children = [html.Img(src="/video_feed", style={
             }), html.Hr(), dbc.Button("Start", outline=True, color="primary", className="mr-1", id='rec_button')])]
         
 def loading(children):
-  return dcc.Loading(children, type='dot', fullscreen=False, style={'opacity': 0.2})	
+  return dcc.Loading(children, type='dot', fullscreen=False, style={'opacity': 0.2})    
 
 
 
@@ -1033,16 +1060,16 @@ def duration2():
   
 
 def get_timeago(dirname):
-	#print(dirname)
+    #print(dirname)
 
-	f = time.time() - os.path.getmtime(dirname)#((max(time.time()-os.stat(root).st_mtime for root,_,_ in os.walk(dirname))))
-	now = datetime.datetime.now() + datetime.timedelta(seconds = f)
+    f = time.time() - os.path.getmtime(dirname)#((max(time.time()-os.stat(root).st_mtime for root,_,_ in os.walk(dirname))))
+    now = datetime.datetime.now() + datetime.timedelta(seconds = f)
 
-	date = datetime.datetime.now()
-	#print (date)
+    date = datetime.datetime.now()
+    #print (date)
 
-	return  (timeago.format(date, now)) # will #print 3 minutes ago
-	  
+    return  (timeago.format(date, now)) # will #print 3 minutes ago
+      
 import glob
 import os
 
@@ -1063,12 +1090,22 @@ for j,idx in enumerate(files[::-1]):
     option_.append({"label": idx , "value" : j+2})
     
 option__ = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
+if IN_COLAB_DRIVE:
+    zipfiles = os.listdir(os.path.join(drive_path,'Dr.Face'))
+
+    option_drive = []
+    for j,idx in enumerate(zipfiles):
+
+        option_drive.append({"label": idx , "value" : j+1})
+        
+    option_drive_ = [{"label":'[DRIVE] '+os.path.join(drive_path, 'Dr.Face',i["label"]), "value":i["value"]} for i in option_drive]
+
 n_options = len(option_)
 if n_options == 0:
-	ow_disabled = True
-	
+    ow_disabled = True
+    
 else:
-	ow_disabled = False
+    ow_disabled = False
 GPUs_opts = [{"label":'CPU', "value":'C'}]+[{"label": i.name+' ['+str(int(i.memoryTotal))+' MB]',"value": i.id} for i in  GPUtil.getGPUs()]
 
 
@@ -1139,11 +1176,12 @@ dbc.FormGroup(
 ])
 
 
-
+if IN_COLAB_DRIVE: start_text_input_disp = {'display':''}
+else: start_text_input_disp = {'display':'none'}
 
 
 Open_modal = html.Div([html.Br(),
-dbc.Select(id = 'start_text_input_', options = option__, value = 2),
+dbc.InputGroup([dbc.Select(id = 'start_text_input_', options = option__, value = 2), dbc.Button(outline=True, id = 'drive_dload', active=False, disabled = False, color="primary", className="fab fa-google-drive",style = start_text_input_disp)]),
 
 html.Br(),
  dbc.FormGroup(
@@ -1237,6 +1275,53 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
             autoFocus = True
           
         ),
+        
+        dbc.Modal(    
+            [   dcc.Loading(html.Div(id="drive_dload_loading"), type='dot', fullscreen=True, style={'opacity': 0.8}),
+                dbc.ModalHeader("Download Workspace from Drive"),
+                dbc.ModalBody([dbc.Select(id = 'drive_dload_input', options = option_drive_, value = 1)]),
+                dbc.ModalFooter(
+                    dbc.Button(
+                        "Download", id="drive_dload_butt", className="ml-auto", disabled = False
+                    )
+                ),
+          
+                
+            ],
+            id="drive_dload_",
+            centered=True,
+         #   backdrop = 'static',
+            autoFocus = True
+          
+        ),
+        
+        
+        dbc.Modal(    
+            [  
+                dbc.ModalHeader("Obtaining Final Output"),
+                dbc.ModalBody([html.Div(id = 'convert_result'),
+                                html.Br(),
+                                dbc.Progress(id = 'merge_progress')]),
+                dbc.ModalFooter(
+                    dbc.Button(
+                        "Okay", id="merge_progress_exit", className="ml-auto", disabled = False, style = {'display':'none'}
+                    )
+                ),
+          
+                
+            ],
+            id="merge_progress_modal",
+            centered=True,
+            backdrop = 'static',
+            autoFocus = True
+          
+        ),
+        
+        
+        
+        
+        
+        
         
         dbc.Modal(
             [
@@ -1506,8 +1591,10 @@ Convert_Tab =  html.Div([dbc.Card(
             id="settings_tabs",
             active_tab="Basic-1",
         ),
+        html.Br(),
         
-        
+        html.Div(dbc.Button('Swap Full Video', id = 'convert_start', size = 'sm', active=True, color="light"), style = {'text-align' : 'center'}),
+
 #html.Br(),    
 
 #dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_)], justify = 'center')
@@ -1581,7 +1668,7 @@ right_frame = dbc.Tabs(
             [
                 dbc.Tab(Preview_vid, label="Preview", tab_id="Preview_vid"),
                 dbc.Tab(Convert_Tab, label="Settings", tab_id="Convert_Tab"),
-                dbc.Tab(final_convert, label="Convert", tab_id="final_Tab"),
+                #dbc.Tab(final_convert, label="Convert", tab_id="final_Tab"),
         
             ],
             id="convert_tabs_1",
@@ -1628,7 +1715,7 @@ html.Div(id = 'okay_face_select_text')])
 controls_start = dbc.Jumbotron(
     [
         html.H1("Start the Process", id  = 'status'),
-	dbc.Tooltip('Description' ,id = 'status_tooltip',
+    dbc.Tooltip('Description' ,id = 'status_tooltip',
             target="status",
             placement = 'left'
         ),
@@ -1676,6 +1763,11 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
             interval=1000, # in milliseconds
             n_intervals=0
         ), 
+        dcc.Interval(
+            id='interval-4',
+            interval=500, # in milliseconds
+            n_intervals=0
+        ),
         
     dbc.Tooltip('Start the process', target="Start-click"),
     #dbc.Tooltip('Show generated results', target="Images-addclick"),
@@ -1714,7 +1806,7 @@ Youtube = loading([dbc.InputGroup(
     
     (html.Div(id = 'youtube-display'))
 
-])	
+])    
 
 #<i class="fab fa-youtube"></i>
 
@@ -1785,7 +1877,7 @@ Youtube_ = loading([dbc.InputGroup(
     
     (html.Div(id = 'youtube-display_2'))
 
-])	
+])    
 
 
 
@@ -1856,6 +1948,7 @@ tabs = html.Div(
             ],
             id="tabs",
             active_tab="tab-1",
+            
         ),
         html.Div(id="content"),
     ]
@@ -1882,9 +1975,11 @@ modal_error = dbc.Modal(
 
 
 app.layout = dbc.Container(
-    [
-        html.H1(["Fake", dbc.Badge("Lab", className="ml-1")],  style={"text-align":"center"}),
-        
+
+    [   html.Br(),
+        html.Br(),
+        #html.Div(html.Img(src = 'assets/logo.PNG', style = {'height': '200px'}), style ={ 'text-align':'center'}),
+       
         tabs,
         
         modal_error,
@@ -1894,9 +1989,9 @@ app.layout = dbc.Container(
             [ 
                 dbc.ModalHeader("Error! No training data found"),
                 dbc.ModalBody("Please restart the program and try again."
-                		),
-                		
-             	
+                        ),
+                        
+                 
           
                 
             ],
@@ -1930,9 +2025,12 @@ app.layout = dbc.Container(
         html.Div(id = 'refresh__', style = {'display': 'none'})   ,
         html.Div(id = 'confirm_delete', style = {'display': 'none'}) ,
         html.Div(id = 'temp_delete', style = {'display': 'none'})    ,   
-        html.Div(id = 'temp_4', style = {'display': 'none'})                  
+        html.Div(id = 'temp_4', style = {'display': 'none'})  ,
+        html.Div(id = 'start_text_continue_', style = {'display': 'none'})                
 ],fluid=True, style = {'width':'60%'}
 )
+
+
 
 
 @app.callback(Output('gpu-error','is_open'), [Input('temp_4', 'children')])        
@@ -1940,9 +2038,9 @@ def toggle_modal(s):
     #print (len(GPUs_opts))
     if len(GPUs_opts)==1:
     
-    	return True
+        return True
     else:
-    	return False
+        return False
 
 @app.callback(
     Output("toggle-add-upload", "is_open"),
@@ -2043,141 +2141,167 @@ def toggle_modal(n1, n2, is_open):
         return not is_open
     return is_open        
         
-                
         
+@app.callback([Output('drive_dload_','is_open'), Output('drive_dload_loading','children')], [Input('drive_dload', 'n_clicks'), Input('drive_dload_butt', 'n_clicks')], [State("drive_dload_input", "value")],)        
+def toggle_modal(n1, n2, n3):
+
+    trigger_id = dash.callback_context.triggered[0]['prop_id']
+    if trigger_id == 'drive_dload.n_clicks':
+        return True, ''
         
+    if trigger_id == 'drive_dload_butt.n_clicks':
+        model = [i['label'] for i in option_drive if i['value'] == int(n3)][0]
+        filep = os.path.join(drive_path, 'Dr.Face', model)
+        print ('\nExtracting files... '+ filep)
+        import zipfile
+        with zipfile.ZipFile(filep, 'r') as zip_ref:
+            zip_ref.extractall('/')
+        print ('Completed\n')
+        return False, ''
+    else:
+        return dash.no_update, dash.no_update
+          
+
+
+    
 @app.callback(Output('New_workspace','disabled'), [Input('interval-3', 'n_intervals')])       
 def toggle_modal(n):
     if len(tar_vids_clip)>0 and len(src_vids_clip)>0 :
-    	return False
+        return False
     else:
-    	return True
+        return True
         
 @app.callback(Output('start_text_input_','options'), [Input('interval-1', 'n_intervals')])       
 def toggle_modal(n):
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     if trigger_id == 'interval-1.n_intervals':
-    	
-    	
-    	trigger_id = dash.callback_context.triggered[0]['prop_id']
-    	error_modal_no_data = dash.no_update
-    	files =os.listdir('/data')
-    	files.sort(key=lambda x: os.path.getmtime('/data/'+x))
-    	option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
-    	for j,idx in enumerate(files[::-1]):
-    		option_.append({"label": idx , "value" : j+2})
-    		
-    	
-    	return [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
-	
+        
+        
+        trigger_id = dash.callback_context.triggered[0]['prop_id']
+        error_modal_no_data = dash.no_update
+        files =os.listdir('/data')
+        files.sort(key=lambda x: os.path.getmtime('/data/'+x))
+        option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
+        for j,idx in enumerate(files[::-1]):
+            option_.append({"label": idx , "value" : j+2})
+            
+        
+        return [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
+    
     else:
-    	return dash.no_update
-    	
-    	
-    	
+        return dash.no_update
+        
+        
+        
                         
-@app.callback( [Output('start_text_input', 'value'), Output('face_type_select', 'value'), Output('start_text_continue', 'n_clicks'), Output('error_modal_no_data', 'is_open'),],
+@app.callback( [Output('start_text_input', 'value'), Output('face_type_select', 'value'), Output('start_text_continue_', 'children'), Output('error_modal_no_data', 'is_open'),],
 [Input('New_modal_Butt', 'n_clicks'), Input('Open_modal_Butt', 'n_clicks'), ],
 [State('select_mode', 'value'),State('select_resolution', 'value'),State('select_device_', 'value'), State('select_device', 'value'), State('select_Batchsize_', 'value'), State('select_Batchsize', 'value'), State('start_text_input_','value'), State('start_text_new','value')] )     
         
 def update(n1,n2,select_mode,select_resolution, select_device_, select_device, select_Batchsize_,select_Batchsize,start_text_input_, start_text_new):
-	global option_
+    global option_
+    global counter_children
+    
+    trigger_id = dash.callback_context.triggered[0]['prop_id']
+    
+    if trigger_id=='New_modal_Butt.n_clicks' or  trigger_id=='Open_modal_Butt.n_clicks': print ('\nStarting... \n')
+    error_modal_no_data = dash.no_update
+    
+    files =os.listdir('/data')
+    files.sort(key=lambda x: os.path.getmtime('/data/'+x))
+    
+    option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
 
-	
-	trigger_id = dash.callback_context.triggered[0]['prop_id']
-	
-	##print (trigger_id)
-	error_modal_no_data = dash.no_update
-	
-	files =os.listdir('/data')
-	files.sort(key=lambda x: os.path.getmtime('/data/'+x))
-	
-	option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
+    for j,idx in enumerate(files[::-1]):
 
-	for j,idx in enumerate(files[::-1]):
+        option_.append({"label": idx , "value" : j+2})
+        
+    option__1 = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
+        
+    if trigger_id == 'New_modal_Butt.n_clicks':
+        if start_text_new == None or start_text_new.strip() == '': start_text_new = 'Untitled'
+        #print (start_text_new)
+        f = open('/tmp/model.txt','w+')
+        
+        convert_id = f.write('_'.join(start_text_new.split(' ')))
 
-	    option_.append({"label": idx , "value" : j+2})
-	    
-	option__1 = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
-		
-	if trigger_id == 'New_modal_Butt.n_clicks':
-		if start_text_new == None or start_text_new.strip() == '': start_text_new = 'Untitled'
-		#print (start_text_new)
-		f = open('/tmp/model.txt','w+')
-		convert_id = f.write('_'.join(start_text_new.split(' ')))
+        f.close()
+        #print (datadir()+'/')
+        if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
+        
+        if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
+        if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
+        if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
+        if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
+        if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
+        #if not os.path.isdir(datadir()+'/params'): os.mkdir(datadir()+'/params')
+        for filename in glob.glob("assets/*.mp4"):os.remove(filename)
+        if not os.path.isdir('assets'): os.mkdir('assets')
+        if type(select_device) == list: select_device = ','.join([str(i) for i in select_device])
+        #print (select_device)
+        #print ('asknksafnklkl')
+        f = open(datadir()+'/.params', 'w+')
+        #print ('****************')
+        #print (select_mode)
+        f.write('facetype '+str(select_mode)+'\n')
+        f.write('Quality '+str(select_resolution)+'\n')
+        f.write('device '+str(select_device)+'\n')
+        f.write('Batchsize '+str(select_Batchsize)+'\n')
+        f.write('suggest_batch_size '+str(0)+'\n')
+        f.close()
+        
+        counter_children = counter_children + 1
 
-		f.close()
-		#print (datadir()+'/')
-		if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
-		
-		if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
-		if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-		if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
-		if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
-		if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
-		#if not os.path.isdir(datadir()+'/params'): os.mkdir(datadir()+'/params')
-		for filename in glob.glob("assets/*.mp4"):os.remove(filename)
-		if not os.path.isdir('assets'): os.mkdir('assets')
-		if type(select_device) == list: select_device = ','.join([str(i) for i in select_device])
-		#print (select_device)
-		#print ('asknksafnklkl')
-		f = open(datadir()+'/.params', 'w+')
-		#print ('****************')
-		#print (select_mode)
-		f.write('facetype '+str(select_mode)+'\n')
-		f.write('Quality '+str(select_resolution)+'\n')
-		f.write('device '+str(select_device)+'\n')
-		f.write('Batchsize '+str(select_Batchsize)+'\n')
-		f.write('suggest_batch_size '+str(0)+'\n')
-		f.close()
-
-		return 1, '1', 1, error_modal_no_data
-		
-	elif trigger_id == 'Open_modal_Butt.n_clicks':
-	
-		model = [i['label'] for i in option_ if i['value'] == int(start_text_input_)][0]
-		#print (model)
-		f = open('/tmp/model.txt','w+')
-		convert_id = f.write(model)
-		f.close()
-		
-		if os.path.isfile(datadir()+"/data_dst.mp4") and os.path.isfile(datadir()+"/data_src.mp4"):
-	
-			if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
-			if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-			if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
-			if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
-			if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
-			for filename in glob.glob("assets/*.mp4"):os.remove(filename)
-			if not os.path.isdir('assets'): os.mkdir('assets')
-			
-			
-			if type(select_device_) == list: select_device_ = ','.join([str(i) for i in select_device_])
-			f = open(datadir()+'/.params', 'r')
-			params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
-			params['Batchsize'] = select_Batchsize_
-			params['device'] = select_device_
-			#print ('asknksafnklkl')
-			##print (params['device'])
-			#print ('asknksafnklkl')
-			f.close()
-			#print ('asknksafnklkl')
-			f = open(datadir()+'/.params', 'w+')
-			f.write('facetype '+str(params['facetype'])+'\n')
-			f.write('Quality '+str(params['Quality'])+'\n')
-			f.write('device '+str(params['device'])+'\n')
-			f.write('Batchsize '+str(params['Batchsize'])+'\n')
-			f.write('suggest_batch_size '+str(params['suggest_batch_size'])+'\n')
-			f.close()
-			#print ('trigerr')
-			#print (start_text_input_)
-			return start_text_input_, dash.no_update, 1, error_modal_no_data
-			
-		else:
-				
-			return dash.no_update, dash.no_update,  dash.no_update, True
-	else:
-    		return  dash.no_update, dash.no_update, dash.no_update,error_modal_no_data
+        return 1, '1', counter_children, error_modal_no_data
+        
+    elif trigger_id == 'Open_modal_Butt.n_clicks':
+    
+        model = [i['label'] for i in option_ if i['value'] == int(start_text_input_)][0]
+        #print (model)
+        f = open('/tmp/model.txt','w+')
+        
+        convert_id = f.write(model)
+        f.close()
+        
+        if os.path.isfile(datadir()+"/data_dst.mp4") and os.path.isfile(datadir()+"/data_src.mp4"):
+    
+            if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
+            if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
+            if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
+            if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
+            if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
+            for filename in glob.glob("assets/*.mp4"):os.remove(filename)
+            if not os.path.isdir('assets'): os.mkdir('assets')
+            
+            
+            if type(select_device_) == list: select_device_ = ','.join([str(i) for i in select_device_])
+            f = open(datadir()+'/.params', 'r')
+            params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+            params['Batchsize'] = select_Batchsize_
+            params['device'] = select_device_
+            #print ('asknksafnklkl')
+            ##print (params['device'])
+            #print ('asknksafnklkl')
+            f.close()
+            #print ('asknksafnklkl')
+            f = open(datadir()+'/.params', 'w+')
+            f.write('facetype '+str(params['facetype'])+'\n')
+            f.write('Quality '+str(params['Quality'])+'\n')
+            f.write('device '+str(params['device'])+'\n')
+            f.write('Batchsize '+str(params['Batchsize'])+'\n')
+            f.write('suggest_batch_size '+str(params['suggest_batch_size'])+'\n')
+            f.close()
+            #print ('trigerr')
+            #print (start_text_input_)
+            counter_children = counter_children + 1
+            print (counter_children)
+            return start_text_input_, dash.no_update, counter_children, error_modal_no_data
+            
+        else:
+                
+            return dash.no_update, dash.no_update,  dash.no_update, True
+    else:
+            return  dash.no_update, dash.no_update, dash.no_update,error_modal_no_data
  
  
  
@@ -2367,13 +2491,13 @@ def update_youtube(n, url):
                 os.remove(i)
         
         for _ in range(5):
-        	try:
-        		with youtube_dl.YoutubeDL(ytdl_format_options) as ydl:
-        			ydl.download([url])
-        		break
-        	except:
-        		pass
-		
+            try:
+                with youtube_dl.YoutubeDL(ytdl_format_options) as ydl:
+                    ydl.download([url])
+                break
+            except:
+                pass
+        
 
         global src_vids
         global HEIGHT
@@ -2463,7 +2587,7 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     
     for i in thread_list:
         os.system('kill -9 '+str(i.pid)+'> /dev/null 2>&1')
-    	#i.terminate()
+        #i.terminate()
         
     
     
@@ -2488,6 +2612,7 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     
     ##########print (pids)
     killall()
+    for filename in glob.glob("/tmp/*npy"):os.remove(filename)
     #shutdown() 
     if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
     time.sleep(1)
@@ -2858,7 +2983,7 @@ def update_button(n_clicks, butt):
     [Input('temp1_2', 'children'), 
       Input('temp2_2', 'children'),
       Input('Reset-addclick_2', 'n_clicks'),Input('Resetal-addclick', 'n_clicks'),],
-	
+    
       [
       State("Reset-addclick_2", "disabled"),
       State("n_video_2", "children"),
@@ -2970,13 +3095,13 @@ def update_youtube(n, url):
         
         
         for _ in range(5):
-        	try:
-        		with youtube_dl.YoutubeDL(ytdl_format_options) as ydl:
-        			ydl.download([url])
-        		break
-        	except:
-        		pass
-        		
+            try:
+                with youtube_dl.YoutubeDL(ytdl_format_options) as ydl:
+                    ydl.download([url])
+                break
+            except:
+                pass
+                
               
         global tar_vids
         global HEIGHT
@@ -3289,7 +3414,7 @@ def update_images(ints,kd,ff,dkkd):
             return ['', '']
 
     else:
-    	return dash.no_update,dash.no_update
+        return dash.no_update,dash.no_update
 
     
     
@@ -3312,14 +3437,22 @@ def open_toast2(is_open):
     
 @app.callback(
     Output("toggle-add-right_frame", "is_open"),
-    [Input("interval-3", "n_intervals"), Input('Resetal-addclick', 'n_clicks'), Input('delete-addclick', 'n_clicks')]
+    [Input("interval-3", "n_intervals"), Input('Resetal-addclick', 'n_clicks'), Input('delete-addclick', 'n_clicks'), Input('New_modal_Butt', 'n_clicks'), Input('Open_modal_Butt', 'n_clicks'),]
 )
-def open_toast1(n,dd,dlld):
+def open_toast1(n,dd,dlld, kll,loo):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
+    trigger_id = dash.callback_context.triggered[0]['prop_id']
+    #if trigger_id == 'New_modal_Butt.n_clicks' or trigger_id == 'Open_modal_Butt.n_clicks':
+     #   if os.path.isfile('/tmp/converting'): 
+      #      os.remove('/tmp/converting')
+       #     return False
     
-    if os.path.isfile('/tmp/running') and len(glob.glob('assets/*mp4'))>0:
+    #if os.path.isfile('/tmp/converting'):
+     #   return True
+    
+    if os.path.isfile('/tmp/running') and len(glob.glob('assets/*mp4'))>0 and len(glob.glob("/tmp/*npy"))>0:
         return True
         
     else:
@@ -3334,33 +3467,33 @@ def open_toast1(n,dd,dlld):
 )
 def open_toast1(n):
 
-	if os.path.isfile('/tmp/running'):
+    if os.path.isfile('/tmp/running'):
 
-		f = open(datadir()+'/.params', 'r')
-		params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
-		f.close()
-		fd = {'0': 'Face & Head', '1':'Full face', '2': 'Half Face'}
-		Qd = {'1':"High",'2':"Medium",'3':"Low",'4':"Very Low"}
-		Rd = {'1':"640",'2':"256",'3':"128",'4':"64"}
-		IRd = {'1':"1080",'2':"512",'3':"480",'4':"256"}
-		Bd = {'1':'Auto','2':'2','4':'4','8':'8','16':'16'}
-		divs= params['device'].split(',') 
-		if 'C' in divs: divs.remove('C')
-		if len(divs) == 0: device_ = 'CPU'
-		else: 
-			device_ = ''
-			for i in divs: 
-				device_ = device_ + 'GPU:'+i + ' '
-		
-		return [html.Div('Path: '+datadir()),
-		html.Div('Mode: '+fd[params['facetype']]),
-		html.Div('Quality: '+Qd[params['Quality']]),
-		html.Div('Face size: '+Rd[params['Quality']]+'x'+Rd[params['Quality']]),
-		html.Div('Image size: '+IRd[params['Quality']]+'x'+IRd[params['Quality']]),
-		html.Div('Batchsize: '+Bd[params['Batchsize']]),
-		html.Div('Device: '+device_)], {'display':''}
-	else:
-		return '',{'display':'none'}
+        f = open(datadir()+'/.params', 'r')
+        params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+        f.close()
+        fd = {'0': 'Face & Head', '1':'Full face', '2': 'Half Face'}
+        Qd = {'1':"High",'2':"Medium",'3':"Low",'4':"Very Low"}
+        Rd = {'1':"640",'2':"256",'3':"128",'4':"64"}
+        IRd = {'1':"1080",'2':"512",'3':"480",'4':"256"}
+        Bd = {'1':'Auto','2':'2','4':'4','8':'8','16':'16'}
+        divs= params['device'].split(',') 
+        if 'C' in divs: divs.remove('C')
+        if len(divs) == 0: device_ = 'CPU'
+        else: 
+            device_ = ''
+            for i in divs: 
+                device_ = device_ + 'GPU:'+i + ' '
+        
+        return [html.Div('Path: '+datadir()),
+        html.Div('Mode: '+fd[params['facetype']]),
+        html.Div('Quality: '+Qd[params['Quality']]),
+        html.Div('Face size: '+Rd[params['Quality']]+'x'+Rd[params['Quality']]),
+        html.Div('Image size: '+IRd[params['Quality']]+'x'+IRd[params['Quality']]),
+        html.Div('Batchsize: '+Bd[params['Batchsize']]),
+        html.Div('Device: '+device_)], {'display':''}
+    else:
+        return '',{'display':'none'}
     
         
         
@@ -3401,16 +3534,16 @@ def display_page(n):
                 Output("interval-1", "interval"),
                 #Output("toggle-add-face", "is_open"),
                 #Output("all_imgs_faces", "children"),
-		 Output("start_buttons","style"),
-		 Output("preview_divs","style"),
-		 Output('Progress_modal_',"is_open"),
-		 Output('progress_msg',"children"),
-		  Output('Progress_modal',"value"),
-		  Output('choose_face_modal',"children"),
-		  Output('error_modal', 'is_open')
+         Output("start_buttons","style"),
+         Output("preview_divs","style"),
+         Output('Progress_modal_',"is_open"),
+         Output('progress_msg',"children"),
+          Output('Progress_modal',"value"),
+          Output('choose_face_modal',"children"),
+          Output('error_modal', 'is_open')
                 ],
               
-    [Input('start_text_continue', 'n_clicks'),Input('interval-1', 'n_intervals'), Input('confirm_delete', 'children'),Input('temp_delete', 'children'), Input('Resetal-addclick', 'n_clicks'),
+    [Input('start_text_continue_', 'children'),Input('interval-1', 'n_intervals'), Input('confirm_delete', 'children'),Input('temp_delete', 'children'), Input('Resetal-addclick', 'n_clicks'),
       Input('delete-addclick', 'n_clicks'), Input('convert_start', 'n_clicks')],
     [State("toggle-add-face", "is_open"), State('start_text_input', 'value'), State("start_text_input", "disabled"), State("face_type_select", "value"), State("interval-1", "interval")])
 
@@ -3452,13 +3585,17 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   
 
   if os.path.isfile('/tmp/ResourceExhaustedError'):
-  	error_modal = True
-  
-  
+      error_modal = True
+      
+  if trigger_id=='convert_start.n_clicks':
+    
+      os.remove('/tmp/running')
+  print (trigger_id)
+  print (n)
   if n is not None:
   
       global watch
-      global labelsdict
+      #global labelsdict
       global run
       global labelsdict
       global total_src_frames
@@ -3469,11 +3606,11 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       global dst_face_list
      #print (thread_list)
        
-      if threadon and trigger_id == 'start_text_continue.n_clicks':
+      if threadon and trigger_id == 'start_text_continue_.children':
         
         open('/tmp/running','w+').close()
         #if os.path.isfile('/tmp/model.txt'): os.remove('/tmp/model.txt')
-        thr = Process(target = Main, args=(gui_queue, labelsdict, run, model_name,))
+        thr = Process(target = Main, args=(gui_queue, model_name,))
          
         thr.start()
         #global thread_list
@@ -3487,7 +3624,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
        #global thread_list
         thread_list.append(thr3)
         
-        if IN_COLAB:
+        if IN_COLAB_DRIVE:
         
             thr2 = Process(target = save_workspace_data, args=())
             thr2.daemon = True
@@ -3519,17 +3656,17 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
      #    cols = dash.no_update
         
       ##print (labelsdict['src_face_labels'],labelsdict['dst_face_labels'])
-      if run.value and threadon_:
+      if os.path.isfile('/tmp/cluster/labelsdict.npy'):
       
         ##print ('#########' +run.value)
         
-        
+        labelsdict = np.load('/tmp/cluster/labelsdict.npy',allow_pickle='TRUE').item()
         
         
           
         if len(labelsdict['src_face_labels']) <=1 and len(labelsdict['dst_face_labels']) <=1:
         
-            run.value = 0
+            shutil.rmtree('/tmp/cluster/')
             
         else:
            
@@ -3613,18 +3750,14 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
             
             cols = html.Div([dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_), ]), dbc.Button('Next ', outline=True, id = 'okay_face_select', active=False, color="success",  size = 'sm',  style = {'margin-left': 'auto', 'margin-right': 'auto'})], id = "cols_", style = {'text-align':'center'})
 
-            
+            os.remove('/tmp/cluster/labelsdict.npy')
             open_choose_box = True
             threadon_ = False
             
       
       
-      	
-      if trigger_id == 'confirm_delete.children':
-      
-        open_choose_box = False
+
         
-        run.value = 0
         
         
       
@@ -3709,17 +3842,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       #return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, open_choose_box, cols]
     
     
-  if trigger_id == 'Resetal-addclick.n_clicks' or trigger_id == 'delete-addclick.n_clicks' or trigger_id == 'convert_start.n_clicks':
-
-    
-
-    
-    start_text_continue_disabled = False
-    start_text_input_disabled = False
-    face_type_select_disabled =False
-    threadon = True
-    threadon_ = True
-    no_loop = False
+  
     #Progress_header = 'Choose an option'
     #status_children = 'Start the Process'
     
@@ -3741,12 +3864,12 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
    
          bb = msglist.split('[')[-1].split(']')[0].split('/')
          Progress_modal = int((int(bb[0])/int(bb[1]))*100)
-	   
+       
      else:
          Progress_modal = 0
 
    
-  else:	
+  else:    
   
      
    
@@ -3767,21 +3890,21 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
          progress_msg = "Completed"
          is_modal_open = False
          Progress_modal = 100
-     		  
+               
     
         
   if not os.path.isfile('/tmp/running'): 
-  	display_ = {'text-align' : 'center'}
-  	display_1 = {"display":"none"}
+      display_ = {'text-align' : 'center'}
+      display_1 = {"display":"none"}
   
   else:
-  	display_ =  {"display":"none"}#dash.no_update
-  	display_1 = {'text-align' : 'center'}
-  	
+      display_ =  {"display":"none"}#dash.no_update
+      display_1 = {'text-align' : 'center'}
+      
   if is_modal_open:
-  	display_ =  {"display":"none"}#dash.no_update
-  	display_1 = {'text-align' : 'none'}
-  	
+      display_ =  {"display":"none"}#dash.no_update
+      display_1 = {'text-align' : 'none'}
+      
 
   try:
        
@@ -3809,7 +3932,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
 
         convert_id = ''
 
-    title_project = html.Div([dbc.Badge(['Training: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
+    title_project = html.Div([dbc.Badge([ dbc.Spinner(size="lg", color = 'danger'), ' Training: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
                     
   
     status_children = title_project
@@ -3854,10 +3977,22 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
 
         
         
+  if trigger_id == 'Resetal-addclick.n_clicks' or trigger_id == 'delete-addclick.n_clicks' or trigger_id == 'convert_start.n_clicks':
+
+    
+
+    
+    start_text_continue_disabled = False
+    start_text_input_disabled = False
+    face_type_select_disabled =False
+    threadon = True
+    threadon_ = True
+    no_loop = False
+    display_ = {'text-align' : 'center'}
+    display_1 = {"display":"none"}
         
-        
-  		
-  ##print(interval_interval)	
+          
+  ##print(interval_interval)    
   return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1, is_modal_open,progress_msg, Progress_modal,cols,error_modal]
     
 
@@ -3986,6 +4121,8 @@ def update(n):
             for i in all_dst_files_delete:
             
                 os.remove(i)  
+                
+            shutil.rmtree('/tmp/cluster/')
 
 
             return " ", '', True, True,True,True,True,{"display":"none"}
@@ -4262,32 +4399,42 @@ def update__(interval):
     
         return [dash.no_update,dash.no_update,dash.no_update]
             
-@app.callback([Output('merge_progress', 'value'),Output('convert_result', 'children')],
-        [Input('convert_start', 'n_clicks'), Input('interval-1', 'n_intervals')])
+@app.callback([Output('merge_progress', 'value'),Output('convert_result', 'children'), Output('merge_progress_modal', 'is_open'),Output('merge_progress_exit', 'style'), ],
+        [Input('convert_start', 'n_clicks'), Input('merge_progress_exit', 'n_clicks'), Input('interval-1', 'n_intervals')])
         
   
-def update__(nd, interval):
+def update__(nd,ne, interval):
 
     trigger_id = dash.callback_context.triggered[0]['prop_id']
-    
+    #merge_progress_modal = dash.no_update
     global cfg_merge 
-    done = 0
+    #done = 0
     #global convert_id
     if nd:
         
-	    f = open('/tmp/model.txt','r')
-	    convert_id = f.read()
-	    f.close()
-	    tar_di = os.path.join(datadir(), convert_id + '.mp4')
-	    ##print (nd)
+        f = open('/tmp/model.txt','r')
+        convert_id = f.read()
+        f.close()
+        tar_di = os.path.join(datadir(), convert_id + '.mp4')
+        ##print (nd)
+    
+    if ne and trigger_id=='merge_progress_exit.n_clicks':
+        
+        os.remove('/tmp/converting')
+        #return dash.no_update, dash.no_update, False,dash.no_update
+         
     
     if nd and trigger_id=='convert_start.n_clicks':
+    
+        open('/tmp/converting','w+').close()
     
         killall()
         ##print ('gb')
         
+        #open('/tmp/converting','w+').close()
+        
         for i in thread_list:
-        	i.terminate()
+            i.terminate()
     
         if os.path.isdir(datadir()+'/data_dst/merged'):
             shutil.rmtree(datadir()+'/data_dst/merged')
@@ -4337,12 +4484,14 @@ def update__(nd, interval):
         thr = Process(target = Convert, args=())
         #thr.daemon=True   
         thr.start()
+        merge_progress_modal = True
         
-        return done, [html.Br(), "Converting frames ", dbc.Spinner(size="sm")]   
+        return 0, ["Converting frames ", dbc.Spinner(size="sm")]   , merge_progress_modal, {'display':'none'}
     
     if nd and trigger_id=='interval-1.n_intervals':
+    
         try:
-    	
+        
         
             ##print (trigger_id, nd); 
             number_of_files = len(os.listdir(datadir()+'/data_dst/merged'))
@@ -4361,23 +4510,31 @@ def update__(nd, interval):
                 done = 100
 
                 
-                done_ = [html.Br(), "Completed"]
+                done_ = [html.Br(), "Completed. [Goto path "+tar_di+' to play it]']
+                
+                sty = {'display':''}
        
             
             else:
-                done_ =  [html.Br(), "Converting frames ", dbc.Spinner(size="sm")]   
+                done_ =  [ "Converting frames ", dbc.Spinner(size="sm")]   
+                sty =  {'display':'none'}
+                
+            
+            merge_progress_modal = os.path.isfile('/tmp/converting')
             
             
-            return done,done_
+            return done,done_, merge_progress_modal, sty
             
         except:
             pass
+            
+    merge_progress_modal = os.path.isfile('/tmp/converting')
     
-    return done, ""
+    return 0, "", merge_progress_modal, {'display':'none'}
     
     
 if __name__ == '__main__':
     
-	app.run_server(debug=False, port =  8000, host = '0.0.0.0')
+    app.run_server(debug=False, port =  4000, host = '0.0.0.0')
 
 #gunicorn app:server -b 0.0.0.0:8080
