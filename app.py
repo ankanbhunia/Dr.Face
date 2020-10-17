@@ -92,6 +92,7 @@ if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
 if os.path.isfile('/tmp/processing'): os.remove('/tmp/processing')
 if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaustedError')
 if os.path.isfile('/tmp/converting'): os.remove('/tmp/converting')
+if os.path.isfile('/tmp/start'): os.remove('/tmp/start')
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
@@ -1929,6 +1930,8 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         f.close()
         
         counter_children = counter_children + 1
+        
+        open('/tmp/start','w+').close()
         return 1, '1', counter_children, error_modal_no_data
         
     elif trigger_id == 'Open_modal_Butt.n_clicks':
@@ -1972,6 +1975,7 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
             #print (start_text_input_)
             counter_children = counter_children + 1
             #print (counter_children)
+            open('/tmp/start','w+').close()
             return start_text_input_, dash.no_update, counter_children, error_modal_no_data
             
         else:
@@ -3040,8 +3044,9 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       global dst_face_list
      #print (thread_list)
        
-      if threadon and trigger_id == 'start_text_continue_.children':
-        
+      if os.path.isfile('/tmp/start'):# and trigger_id == 'start_text_continue_.children':
+
+        os.remove('/tmp/start')
         open('/tmp/running','w+').close()
         #if os.path.isfile('/tmp/model.txt'): os.remove('/tmp/model.txt')
         thr = Process(target = Main, args=(gui_queue, model_name,))
