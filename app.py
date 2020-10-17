@@ -1,5 +1,4 @@
 from importlib import reload  
-
 import zipfile
 import tqdm
 from subprocess import getoutput
@@ -14,6 +13,7 @@ from flask import Flask, Response
 import threading
 import cv2
 import time
+import io
 import os
 import base64
 import dash_daq as daq
@@ -67,7 +67,6 @@ global no_loop
 no_loop = False
 run = Value("i", 0)
 manager = Manager()
-
 global total_src_frames
 global total_src_frames_paths
 total_src_frames = 0
@@ -87,67 +86,45 @@ convert_disabled = False
 import dash_player
 import argparse
 from random import *
-
 if not os.path.isdir('/data'): os.mkdir('/data')
-
 import atexit
 if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
 if os.path.isfile('/tmp/processing'): os.remove('/tmp/processing')
 if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaustedError')
 if os.path.isfile('/tmp/converting'): os.remove('/tmp/converting')
-
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
-
 parser = argparse.ArgumentParser(description='FakeLab Options')
-
 parser.add_argument('drivepath', type=str, nargs='?',
                     help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
-
-
-
 argss = parser.parse_args()
 if argss.drivepath == None:
     argss.drivepath = 'drive/My Drive/'
 drive_path = argss.drivepath
-
 IN_COLAB_DRIVE = IN_COLAB and os.path.isdir(drive_path)
-
-
 if os.path.isdir(drive_path):
   if not os.path.isdir(os.path.join(drive_path, 'Dr.Face')):os.mkdir(os.path.join(drive_path, 'Dr.Face'))
-
-
 def kill_pythons():
-
     import psutil
     import os
-
     for proc in psutil.process_iter():
         pinfo = proc.as_dict(attrs=['pid', 'name'])
         procname = str(pinfo['name'])
         procpid = str(pinfo['pid'])
         if "python" in procname and procpid != str(os.getpid()):
-
             #print("Stopped Python Process ", proc)
             proc.kill()
-
 def killall():
-
     
-
-
     os.system('fuser -k /dev/nvidia-uvm > /dev/null 2>&1')
     
           
 killall()
-
 def exit_handler():
     
     #print ('\nexiting program.... ')
-
     killall()
     killall()
     kill_pythons()
@@ -161,12 +138,8 @@ def exit_handler():
     if not IN_COLAB: os.system('fuser -k /usr/bin/python3.6')
     
     
-
 if not IN_COLAB: atexit.register(exit_handler)
-
-
 class merging_vars:
-
   def __init__(self, 
                 #face_type = None,
                 output_face_scale = 0,
@@ -190,7 +163,6 @@ class merging_vars:
                 vertical_shift = 0,
                 show_mode = 1
                 ):
-
     #self.face_type = face_type
     self.output_face_scale = output_face_scale
     self.super_resolution_power = super_resolution_power
@@ -212,17 +184,12 @@ class merging_vars:
     self.horizontal_shift = horizontal_shift
     self.vertical_shift = vertical_shift
     self.show_mode = show_mode
-
 #[os.remove(os.path.join('/tmp',i)) for i in os.listdir('/tmp') if i.endswith('.npy')]
-
 def shutdown():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
-
-
-
 with open('/tmp/log.txt', 'w') as f:
         f.close()
         
@@ -236,18 +203,12 @@ def run_cmd(cmd):
         f.close()
         
     p.wait()
-
-
-
 #if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
 #if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
 #if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
 #if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
 #if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-
-
 if not os.path.isfile('/tmp/model.txt'):
-
 #    convert_id = (''.join(map(choice,["bcdfghjklmnpqrstvwxz","aeiouy"]*3)))
             
     f = open('/tmp/model.txt','w+')
@@ -255,14 +216,11 @@ if not os.path.isfile('/tmp/model.txt'):
     f.close()
     
 def datadir():
-
      f = open('/tmp/model.txt','r')
      n = f.read()
      return os.path.join('/data', n)
     
 from inspect import currentframe, getframeinfo
-
-
 class VideoCamera(object):
     def __init__(self):
         self.open = True
@@ -271,10 +229,8 @@ class VideoCamera(object):
         # self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
         self.video_out = cv2.VideoWriter('videos/Record/temp.mp4', -1, 20.0, (640,480))
         self.frame_counts = 1
-
     def __del__(self):
         self.video.release()
-
     def get_frame(self):
         
         try:
@@ -285,10 +241,8 @@ class VideoCamera(object):
             pass
     
     def record(self):
-
         timer_start = time.time()
         timer_current = 0
-
         while(self.open==True):
             try:
                 ret, video_frame = self.success, self.image
@@ -296,46 +250,33 @@ class VideoCamera(object):
             except:
                 break
             if (ret==True):
-
                     self.video_out.write(video_frame)
                     self.frame_counts += 1
                     time.sleep(1/10)
             else:
                 break
-
     def stop(self):
-
         if self.open==True:
-
             self.open=False
             self.video_out.release()
             self.video.release()
             cv2.destroyAllWindows()
-
         else: 
             pass
-
-
     def start(self):
         video_thread = threading.Thread(target=self.record)
         video_thread.start()
-
-
 def gen(camera):
     while camera.open:
         frame = camera.get_frame()
         yield (b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
-
 def get_sec2time(s):
-
-
     hours, rem = divmod(s, 3600)
     minutes, seconds = divmod(rem, 60)
     hours = int(hours)
     minutes = int(minutes)
     seconds = int(seconds)
-
     if hours == 0:
       if  minutes <10:
         if seconds <10:
@@ -346,17 +287,12 @@ def get_sec2time(s):
         return str(minutes)+':'+str(seconds)
     else:
       return str(hours)+':'+str(minutes)+':'+str(seconds)
-
-
 def get_interval_func(start_time):
-
     hours, rem = divmod(time.time()-start_time, 3600)
     minutes, seconds = divmod(rem, 60)
     hours = int(hours)
     minutes = int(minutes)
     seconds = int(seconds)
-
-
     def sec(s):
       if s == 0:
         return ''
@@ -364,7 +300,6 @@ def get_interval_func(start_time):
         return str(1) + ' second '
       else:
         return str(s) + ' seconds'
-
     def min(s):
       if s == 0:
         return ''
@@ -372,7 +307,6 @@ def get_interval_func(start_time):
         return str(1) + ' minute '
       else:
         return str(s) + ' minutes '
-
     def hour(s):
       if s == 0:
         return ''
@@ -380,36 +314,26 @@ def get_interval_func(start_time):
         return str(1) + ' hour '
       else:
         return str(s) + ' hours '
-
-
     return str(hours)+':'+str(minutes)+':'+str(seconds)#hour(hours) + min(minutes) + sec(seconds)
-
 class stopWatch:
-
   def __init__(self):
     pass
   def start(self):
     self.start_time = time.time() 
   def end(self):
     self.end_time = time.time()
-
   def get_interval(self):
     return get_sec2time(time.time()-self.start_time)
-
 def Convert():
-
-
     f = open('/tmp/model.txt','r')
     convert_id = f.read()
     f.close()
         
       
     output_name =  convert_id + '.mp4'
-
     ###########print ('###############################' + output_name
     if not os.path.isdir(datadir()+'/data_dst/merged'): os.mkdir(datadir()+'/data_dst/merged')
     if not os.path.isdir(datadir()+'/data_dst/merged_mask'): os.mkdir(datadir()+'/data_dst/merged_mask')
-
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py merge --input-dir '+datadir()+'/data_dst --output-dir '+datadir()+'/data_dst/merged --output-mask-dir '+datadir()+'/data_dst/merged_mask --aligned-dir '+datadir()+'/data_dst/aligned --model-dir '+datadir()+'/model --model SAEHD')
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py videoed video-from-sequence --input-dir '+datadir()+'/data_dst/merged --output-file '+datadir()+'/'+output_name+' --reference-file '+datadir()+'/data_dst.mp4 --include-audio')
     #os.system('cp '+datadir()+'/'+output_name+' /data')
@@ -420,11 +344,8 @@ def Convert():
     
     ###########print ('###############################' + 'convertion done')
     
-
 def save_workspace_data():
-
     time.sleep(3600)
-
     while 1:
        
       
@@ -439,11 +360,8 @@ def save_workspace_data():
       os.system('rm '+convert_id+'.zip')
       ##########print ('###############################' + 'save_workspace_data')
       time.sleep(3600)
-
 def save_workspace_model():
-
   while 1:
-
     time.sleep(3600*2)
     #print ('jjkdhsjksjkdkdkdkdkldkdkdkdlld###############' + convert_id)
     
@@ -455,7 +373,6 @@ def save_workspace_model():
     
     
 def get_preview(thr):
-
     #time.sleep(6000)
     if not os.path.isdir(datadir()): os.mkdir(datadir())
     if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
@@ -472,20 +389,26 @@ def get_preview(thr):
             os.system('rm -r '+datadir()+'/preview/merged')
             os.mkdir(datadir()+'/preview/merged')
         
-            os.system("printf '0\nCPU\n' |  "+PYTHON_PATH+" DeepFaceLab/main.py merge --input-dir "+datadir()+"/preview --output-dir "+datadir()+"/preview/merged --output-mask-dir "+datadir()+"/preview/merged_mask --aligned-dir "+datadir()+"/preview/aligned --model-dir "+datadir()+"/model --model SAEHD --cpu-only ")#> /dev/null 2>&1")
+            os.system("printf '0\nCPU\n' |  "+PYTHON_PATH+" DeepFaceLab/main.py merge --input-dir "+datadir()+"/preview --output-dir "+datadir()+"/preview/merged --output-mask-dir "+datadir()+"/preview/merged_mask --aligned-dir "+datadir()+"/preview/aligned --model-dir "+datadir()+"/model --model SAEHD --cpu-only  > /dev/null 2>&1")#> /dev/null 2>&1")
             os.system("printf '10\n' | "+PYTHON_PATH+" DeepFaceLab/main.py videoed video-from-sequence_  --input-dir "+datadir()+"/preview/merged --output-file "+datadir()+"/result_preview.mp4 > /dev/null 2>&1")#> /dev/null 2>&1")
             
             import moviepy.editor as mp
-
             if not os.path.isdir('assets'): os.mkdir('assets')
             
             if os.path.isfile(datadir()+"/result_preview.mp4"):
+                
+                text_trap = io.StringIO()
+                sys.stdout = text_trap
+
+                
                 clip_resized = mp.VideoFileClip(datadir()+"/result_preview.mp4")
                 #clip_resized = clip.resize(height=360) # make the height 360px ( According to moviePy documenation The width is then computed so that the width/height ratio is conserved.)
                 convert_id_ = (''.join(map(choice,["bcdfghjklmnpqrstvwxz","aeiouy"]*3)))
                 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
                 
                 clip_resized.write_videofile("assets/result_preview"+convert_id_+".mp4")
+                
+               
                 
                 
             else:
@@ -503,7 +426,6 @@ def put_msg(msg):
     f = open('/tmp/processing','w+')
     f.write(msg)
     f.close()
-
 def Main(q, option_id):
     
     ###########print ('############')
@@ -527,10 +449,7 @@ def Main(q, option_id):
     
     
     
-
-
     #print (option_id)
-
     
     if model == '(1) New Workspace':
         
@@ -562,18 +481,14 @@ def Main(q, option_id):
         
             
             source_files_merge = concatenate_videoclips(src_vids_clip)
-
             source_files_merge.write_videofile(datadir()+'/data_src.mp4',) 
                 
             
                 
-
             q.put  ('[3/12] Merging Target Videos')
             put_msg('[3/12] Merging Target Videos')
             
-
             target_files_merge = concatenate_videoclips(tar_vids_clip)
-
             target_files_merge.write_videofile(datadir()+'/data_dst.mp4',) 
         
                 
@@ -644,7 +559,6 @@ def Main(q, option_id):
                 else:
                 
                     break
-
             os.system(PYTHON_PATH+' DeepFaceLab/preview.py')
             
             
@@ -672,7 +586,6 @@ def Main(q, option_id):
             
             #p = [subprocess.Popen("echo | python DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True),
             #    subprocess.Popen("echo | python DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True)]
-
             #p_ = [p[0].wait(), p[1].wait()]
             
             #if p_[0] != 0 and p_[1]!= 0: 
@@ -688,23 +601,14 @@ def Main(q, option_id):
             if p != 0: 
                 q.put('Error while extracting face masks! ')
                 return False
-
-
             q.put  ('[12/12] Preparing to start Training')
             put_msg('[12/12] Preparing to start Training')
-
-
-
             import os
             #os.chdir("/content")
-
-
             import  os, time
-
             
             
             
-
             q.put('Training In Progress')
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
             
@@ -736,7 +640,6 @@ def Main(q, option_id):
         convert_id = model#.split(datadir()+'_')[-1].split('.')[0]
         
         #if not os.path.isfile('/tmp/model.txt'):
-
         #convert_id = (''.join(map(choice,["bcdfghjklmnpqrstvwxz","aeiouy"]*3)))
         
         #os.system('rm -r '+datadir()+'')
@@ -757,7 +660,6 @@ def Main(q, option_id):
         
         
         #model_name = datadir()+'_'+convert_id + '.zip'
-
         #if os.path.isfile(datadir()+'/data_dst.mp4') and os.path.isfile(datadir()+'/data_src.mp4'):
         
         if os.path.isfile(datadir()+'/model/iteration.txt'):
@@ -774,17 +676,11 @@ def Main(q, option_id):
             put_msg('[2/2] Loading Workspace')
             
             #print ('################################3')
-
             import os
             #os.chdir("/content")
-
-
-
             q.put('Training In Progress')
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
-
             p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
-
             q.put(':Stopped:')
                 
             return True
@@ -860,7 +756,6 @@ def Main(q, option_id):
                 else:
                 
                     break
-
             os.system(PYTHON_PATH+' DeepFaceLab/preview.py')
             
             
@@ -888,7 +783,6 @@ def Main(q, option_id):
             
             #p = [subprocess.Popen("echo | python DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_src/aligned", shell=True),
             #    subprocess.Popen("echo | python DeepFaceLab/main.py facesettool enhance --input-dir "+datadir()+"/data_dst/aligned", shell=True)]
-
             #p_ = [p[0].wait(), p[1].wait()]
             
             #if p_[0] != 0 and p_[1]!= 0: 
@@ -904,26 +798,16 @@ def Main(q, option_id):
             if p != 0: 
                 q.put('Error while extracting face masks! ')
                 return False
-
-
             q.put  ('[10/10] Preparing to start Training')
             put_msg('[10/10] Preparing to start Training')
-
-
-
             import os
             #os.chdir("/content")
-
-
             import  os, time
-
             
             
             
-
             q.put('Training In Progress')
             if os.path.isfile('/tmp/processing'):os.remove('/tmp/processing')
-
              
             p = os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py train --training-data-src-dir '+datadir()+'/data_src/aligned --training-data-dst-dir '+datadir()+'/data_dst/aligned --pretraining-data-dir pretrain --model-dir '+datadir()+'/model --model SAEHD')
             
@@ -943,11 +827,8 @@ def Main(q, option_id):
         
           
             
-
 import os
-
 import logging
-
 server = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -957,13 +838,9 @@ app.update_title = None
 server = app.server
 global slider_prev_instance 
 slider_prev_instance = [0,1000]
-
-
 global threadon 
-
 threadon = True
 global threadon_ 
-
 threadon_ = True
 global gui_queue
 gui_queue = Queue() 
@@ -971,66 +848,50 @@ global slider_prev_instance2
 slider_prev_instance2 = [0,1000]
 global storemsg
 storemsg= ''
-
 global start
 start = ''
 global tt
 tt = False
 global watch
 watch = stopWatch()
-
 global tt1
 tt1 = False
-
-
 global tt2
 tt2 = False
 global msglist 
-
 global HEIGHT
 HEIGHT = 256
-
 global src_vids
 src_vids = []
 global tar_vids
 tar_vids = []
 msglist = 'Initializing'
-
-
 global src_vids_clip
 src_vids_clip = []
-
 global tar_vids_clip
 tar_vids_clip = []
-
-
 global horizontal_shear
 global vertical_shear
 global horizontal_shift
 global vertical_shift
 global ind_preview
-
 horizontal_shear = 0
 vertical_shear = 0
 horizontal_shift = 0
 vertical_shift = 0
 ind_preview = 0
-
 if not os.path.isdir('videos'): os.mkdir('videos')
-
 if not os.path.isdir('videos/Source'): os.mkdir('videos/Source')
 if not os.path.isdir('videos/Source/Youtube'): os.mkdir('videos/Source/Youtube')
 if not os.path.isdir('videos/Source/Upload'): os.mkdir('videos/Source/Upload')
 if not os.path.isdir('videos/Source/Record'): os.mkdir('videos/Source/Record')
 if not os.path.isdir('videos/Source/Final'): os.mkdir('videos/Source/Final')
-
 if not os.path.isdir('videos/Target'): os.mkdir('videos/Target')
 if not os.path.isdir('videos/Target/Youtube'): os.mkdir('videos/Target/Youtube')
 if not os.path.isdir('videos/Target/Upload'): os.mkdir('videos/Target/Upload')
 if not os.path.isdir('videos/Target/Record'): os.mkdir('videos/Target/Record')
 if not os.path.isdir('videos/Target/Final'): os.mkdir('videos/Target/Final')
   
-
 record = [html.Div(children = [html.Img(src="/video_feed", style={
             'width': '266px',
             'height': '200px'
@@ -1038,19 +899,13 @@ record = [html.Div(children = [html.Img(src="/video_feed", style={
         
 def loading(children):
   return dcc.Loading(children, type='dot', fullscreen=False, style={'opacity': 0.2})    
-
-
-
-
 def video_index():
   global src_vids_clip
   
   return len(src_vids_clip)
-
 def video_index2():
   global tar_vids_clip
   return len(tar_vids_clip)
-
 def duration():
   global src_vids_clip
   return int(sum([i.duration for i in src_vids_clip]))
@@ -1058,48 +913,36 @@ def duration2():
   global tar_vids_clip
   return int(sum([i.duration for i in tar_vids_clip]))
   
-
 def get_timeago(dirname):
     #print(dirname)
-
     f = time.time() - os.path.getmtime(dirname)#((max(time.time()-os.stat(root).st_mtime for root,_,_ in os.walk(dirname))))
     now = datetime.datetime.now() + datetime.timedelta(seconds = f)
-
     date = datetime.datetime.now()
     #print (date)
-
     return  (timeago.format(date, now)) # will #print 3 minutes ago
       
 import glob
 import os
-
 search_dir = "/data/"
 # remove anything from the list that is not a file (directories, symlinks)
 # thanks to J.F. Sebastion for pointing out that the requirement was a list 
 # of files (presumably not including directories)  
 files =os.listdir('/data')
 files.sort(key=lambda x: os.path.getmtime('/data/'+x))
-
 #print (files)   
 global option_  
-
 option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
-
 for j,idx in enumerate(files[::-1]):
-
     option_.append({"label": idx , "value" : j+2})
     
 option__ = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
 if IN_COLAB_DRIVE:
     zipfiles = os.listdir(os.path.join(drive_path,'Dr.Face'))
-
     option_drive = []
     for j,idx in enumerate(zipfiles):
-
         option_drive.append({"label": idx , "value" : j+1})
         
     option_drive_ = [{"label":'[DRIVE] '+os.path.join(drive_path, 'Dr.Face',i["label"]), "value":i["value"]} for i in option_drive]
-
 n_options = len(option_)
 if n_options == 0:
     ow_disabled = True
@@ -1107,16 +950,9 @@ if n_options == 0:
 else:
     ow_disabled = False
 GPUs_opts = [{"label":'CPU', "value":'C'}]+[{"label": i.name+' ['+str(int(i.memoryTotal))+' MB]',"value": i.id} for i in  GPUtil.getGPUs()]
-
-
-
-
-
 New_modal = html.Div([html.Br(),
 dbc.Input(placeholder="Enter Workspace Name", id="start_text_new"),
 html.Br(),
-
-
 dbc.FormGroup([
  
         dbc.Label("Select Mode:"),
@@ -1143,7 +979,6 @@ dbc.FormGroup([
         ),]
     
 ),
-
  dbc.FormGroup(
     [
         dbc.Label("Select Device:"),
@@ -1155,7 +990,6 @@ dbc.FormGroup([
         ),
     ]
 ),
-
 dbc.FormGroup(
     [
         dbc.Label("Select Batchsize:"),
@@ -1174,20 +1008,14 @@ dbc.FormGroup(
     ]
 )
 ])
-
-
 if IN_COLAB_DRIVE: start_text_input_disp = {'display':''}
 else: start_text_input_disp = {'display':'none'}
-
-
 Open_modal = html.Div([html.Br(),
 dbc.InputGroup([dbc.Select(id = 'start_text_input_', options = option__, value = 2), dbc.Button(outline=True, id = 'drive_dload', active=False, disabled = False, color="primary", className="fab fa-google-drive",style = start_text_input_disp)]),
-
 html.Br(),
  dbc.FormGroup(
    
 ),
-
  dbc.FormGroup(
     [
         dbc.Label("Select Device:"),
@@ -1199,7 +1027,6 @@ html.Br(),
         ),
     ]
 ),
-
 dbc.FormGroup(
     [
         dbc.Label("Select Batchsize:"),
@@ -1218,16 +1045,8 @@ dbc.FormGroup(
     ]
 )
 ])
-
-
-
 Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(),dbc.Progress(value=0, id="Progress_modal", striped=True, animated = True)])
-
-
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
-
-
-
 Progress =  html.Div([html.Div([dbc.Button(' New',outline=False, id = 'New_workspace',  active=False, disabled = True, color="light", className="fas fa-plus",),
 dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled = False,color="light", className="fas fa-redo")], id = 'start_buttons', style = {'text-align' : 'center', 'color':'blue'})
 ,dbc.Modal(
@@ -1304,7 +1123,7 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
                                 dbc.Progress(id = 'merge_progress')]),
                 dbc.ModalFooter(
                     dbc.Button(
-                        "Okay", id="merge_progress_exit", className="ml-auto", disabled = False, style = {'display':'none'}
+                        "Finish", id="merge_progress_exit", className="ml-auto", disabled = False, style = {'display':'none'}
                     )
                 ),
           
@@ -1350,8 +1169,6 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
         html.Div([html.Br(), html.Div(id = 'preview_graph'), html.Br(),html.Div(id = 'preview_imgs'),dbc.Progress(id = 'preview_progress', style={"height": "6px"})], id= 'preview_divs', style = {'display':'none'})])
         
        
-
-
 #dbc.InputGroup(
 #            [dbc.InputGroupAddon("Model", addon_type="prepend"), dbc.Select(id = 'start_text_input', options = option_, value = '0'), dbc.Select(id = 'face_type_select', 
 #            options = [{'label' : 'Head', 'value' : '0'}, {'label' : 'Full face', 'value' : '1'}, {'label' : 'Face', 'value' : '2'}], value = '1'),
@@ -1361,7 +1178,6 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
 #        ), html.Br(), html.Div(id = 'preview_graph'), html.Br(),loading(html.Div(id = 'preview_imgs'))]), #dcc.RadioItems(id = 'Progress_select', value = ''), html.Hr(id = 'hr2'), 
 #dbc.Button('Continue', size="sm", id = 'start_text_continue'),  
 #html.Hr(id = 'hr3'), html.Div(id = 'progress_field')]
-
 try:
     url=os.path.join('assets', glob.glob("assets/*mp4")[0].split('/')[-1])
 except:
@@ -1372,17 +1188,9 @@ Preview_vid = html.Div([dash_player.DashPlayer(
     url = url,
     controls=True, loop = True, playing = True, width='100%', height='100%', 
 ),
-
-
-
-
 ])
-
-
     
-
     
-
 size_layout  = dbc.Card(
     dbc.CardBody(
     
@@ -1405,9 +1213,6 @@ size_layout  = dbc.Card(
     ),
     style={"width": "10rem"},
 )
-
-
-
 shift_layout = dbc.Card(
     dbc.CardBody(
         [   dbc.Row(daq.Slider(min=0,max=50,value=10,step=1, id = "shift_step", size = 150)),
@@ -1428,22 +1233,13 @@ shift_layout = dbc.Card(
     ),
     style={"width": "10rem"},
 )
-
-
-
-
-
 basic_Set = [ html.Br(),
-
-
-
 dbc.Row([(dbc.InputGroup([dbc.InputGroupAddon("Mask type", addon_type="prepend"),dbc.Select(id = 'mask_mode_', options = [{'label':'dst', "value" :1},
 {'label':'learned-prd', "value" :2}, 
 {'label':'learned-dst', "value" :3}, 
 {'label':'learned-prd*learned-dst', "value" :4}, 
 {'label':'learned-prd+learned-dst', "value" :5},  
 ], value = 3),], size="sm",)), 
-
 (dbc.InputGroup([dbc.InputGroupAddon("Mode", addon_type="prepend"),dbc.Select(id = 'mode_', options = [{'label':'original', "value" :'original'},
 {'label':'overlay', "value" :'overlay'}, 
 {'label':'hist-match', "value" :'hist-match'}, 
@@ -1451,7 +1247,6 @@ dbc.Row([(dbc.InputGroup([dbc.InputGroupAddon("Mask type", addon_type="prepend")
 {'label':'seamless-hist-match', "value" :'seamless-hist-match'},  
 {'label':'raw-rgb', "value" :'raw-rgb'}, 
 {'label':'raw-predict', "value" :'raw-predict'}], value = 'overlay') ], size="sm",)),
-
 (dbc.InputGroup([dbc.InputGroupAddon("Color mode", addon_type="prepend"),dbc.Select(id = 'color_mode_', options = [{'label':'None', "value" :0},
 {'label':'rct', "value" :1}, 
 {'label':'lct', "value" :2}, 
@@ -1461,10 +1256,7 @@ dbc.Row([(dbc.InputGroup([dbc.InputGroupAddon("Mask type", addon_type="prepend")
 {'label':'idt-m', "value" :6},  
 {'label':'sot-m', "value" :7}, 
 {'label':'mix-m', "value" :8}], value = '0')], size="sm"))], justify = 'center',  no_gutters=True,),
-
-
     
-
             ]
             
             
@@ -1476,7 +1268,6 @@ adv_set = [dbc.CardBody([
   step=1,
   id = "motion_blur_power_", marks = {0: '0', 100:'100', 50: 'Motion Blur Power'}
 ),
-
 html.Br(),
 dcc.Slider(
   min=-400,
@@ -1521,7 +1312,6 @@ html.Br(),
   step=1,
   id = "color_degrade_power_",  marks = {0: '0', 100:'100', 50: 'Color Degrade Power'}
 )])]
-
 Convert_Tab =  html.Div([dbc.Card(
     [   
         
@@ -1548,7 +1338,6 @@ Convert_Tab =  html.Div([dbc.Card(
                 
             dbc.Button( id = 'refresh_img', active=False, disabled = convert_disabled, color="light", size = 'sm', className="fas fa-redo"),
             
-
                 dbc.Button( id = 'okay_merge', active=False, disabled = convert_disabled, color="light", size = 'sm', className="fas fa-sign-in-alt"),
                 
                 ]),
@@ -1567,7 +1356,6 @@ Convert_Tab =  html.Div([dbc.Card(
     #dbc.Tooltip('Choose Workspace', target="convert_model_continue"),
     #dbc.Tooltip('Refresh Preview Image', target="refresh_img"),
     #dbc.Tooltip('Convert', target="okay_merge"),
-
         
         html.Div(dbc.ButtonGroup(
             [dbc.Button( id = 'v_plus_size', active=False, disabled = convert_disabled, color="light",size = 'sm', className="fas fa-plus-circle"),
@@ -1579,13 +1367,11 @@ Convert_Tab =  html.Div([dbc.Card(
             dbc.Button( id = 'h_plus_shift', active=False, disabled = convert_disabled, color="light",size = 'sm', className="fas fa-chevron-circle-right"),
             dbc.Button( id = 'v_minus_shift', active=False, disabled = convert_disabled, color="light",size = 'sm',className="fas fa-chevron-circle-down"),
             ]), style = {'text-align':'center', 'margin-top':'-23px'})]) ,
-
     dbc.Tabs(
             [
                 dbc.Tab(basic_Set, label="Basic", tab_id="Basic-1"),
                 dbc.Tab(adv_set, label="Advanced", tab_id="Advanced-1"),
                 
-
         
             ],
             id="settings_tabs",
@@ -1594,12 +1380,9 @@ Convert_Tab =  html.Div([dbc.Card(
         html.Br(),
         
         html.Div(dbc.Button('Swap Full Video', id = 'convert_start', size = 'sm', active=True, color="light"), style = {'text-align' : 'center'}),
-
 #html.Br(),    
-
 #dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_)], justify = 'center')
   
-
     
       dbc.Tooltip('Stretch face vertically', target="v_plus_size"),
             dbc.Tooltip('Shrink face horizontally', target="h_minus_size"),
@@ -1611,7 +1394,7 @@ Convert_Tab =  html.Div([dbc.Card(
             dbc.Tooltip('Move face to the right', target="h_plus_shift"),
             dbc.Tooltip('Move face downward', target="v_minus_shift"),
             dbc.Tooltip('Refresh Image', target="refresh_img"),
-           # dbc.Tooltip('Save Settings', target="okay_merge"),
+            dbc.Tooltip('Save Settings', target="okay_merge"),
             
             dbc.Tooltip('Resultant frame', target="default_pre"),
             dbc.Tooltip('Original frame', target="ori_pre"),
@@ -1621,24 +1404,7 @@ Convert_Tab =  html.Div([dbc.Card(
         ],
         
     ),
-
-
-
-
-
-
-
-
-
-
-
-
 ])
-
-
-
-
-
 final_convert = dbc.Jumbotron(
 [
 dbc.Container(
@@ -1659,11 +1425,6 @@ dbc.Container(
 ],
 fluid=True,
 )
-
-
-
-
-
 right_frame = dbc.Tabs(
             [
                 dbc.Tab(Preview_vid, label="Preview", tab_id="Preview_vid"),
@@ -1674,20 +1435,13 @@ right_frame = dbc.Tabs(
             id="convert_tabs_1",
             active_tab="Preview_vid",
         )
-
 #dbc.Row([dbc.Col(html.Button('Button 1', id='btn-nclicks-1')), dbc.Col(html.Button('Button 2', id='btn-nclicks-2'))], justify = 'center')
-
 #dbc.ButtonGroup(
 #            [dbc.Button(outline=True, id = 'convert_settings', active=False, disabled = False, color="success", className="fas fa-hourglass-start"),
-
 #dbc.Button('Convert', id = 'convert_', active=False, disabled = False, color="danger")],
 #           
 #            className="mr-1",  style = {'text-align' : 'center'}),
-
-
-
             
-
 #Images = loading([
 #dbc.Tabs(
   #   [
@@ -1697,8 +1451,6 @@ right_frame = dbc.Tabs(
 #    ]), dbc.Button(outline=True, id = 'Images-refresh', active=False, disabled = False, color="success", className="fas fa-redo-alt")]
 #)#[(html.Div(id = 'ImagesG'))]
 #Result = [(html.Div(id = 'Result_out'))]
-
-
 try:
     sec_s = ' [Updated ' +str(int(time.time() - os.path.getctime(glob.glob("assets/*mp4")[0]))//60)  + ' minutes ago]'
     
@@ -1707,11 +1459,7 @@ except:
     sec_s = ''
     
 choose_face = html.Div([html.Div(id = 'all_imgs_faces'), html.Br(),
-
-
-
 html.Div(id = 'okay_face_select_text')])
-
 controls_start = dbc.Jumbotron(
     [
         html.H1("Start the Process", id  = 'status'),
@@ -1736,7 +1484,6 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
         dbc.Row([dbc.Col(dbc.Toast(Progress, id="toggle-add-Progress",header="Getting Started",is_open=True,icon="primary",dismissable=True,  style={"maxWidth": "1000px"})),
         dbc.Col(dbc.Toast(right_frame, id="toggle-add-right_frame",header=""+sec_s,is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "1000px"}))], no_gutters=True,),
     
-
         
         #dbc.Toast(Images, id="toggle-add-Images",header="Generated Images",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "800px"}),
         #dbc.Toast(Settings, id="toggle-add-Settings",header="Edit configuration file",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "450px"}),
@@ -1777,8 +1524,6 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
     
     ]
 )
-
-
 upload= loading([(dcc.Upload([
         'Drag and Drop or ',
         html.A('Select a File')
@@ -1799,24 +1544,12 @@ Youtube = loading([dbc.InputGroup(
             [dbc.Input(bs_size="sm", id = 'utube-url'), dbc.Button("Submit", color="primary", id = 'utube-button', size="sm")],
             size="sm",
         ),
-
-
-
-
     
     (html.Div(id = 'youtube-display'))
-
 ])    
-
 #<i class="fab fa-youtube"></i>
-
 #<i class="fas fa-cloud-upload-alt"></i>
-
 #<i class="fas fa-trash-restore"></i>
-
-
-
-
 controls = dbc.Jumbotron(
     [
         html.H1(["Source Video" ]),
@@ -1848,9 +1581,6 @@ controls = dbc.Jumbotron(
       
     ]
 )
-
-
-
 upload_= loading([(dcc.Upload([
         'Drag and Drop or ',
         html.A('Select a File')
@@ -1866,21 +1596,15 @@ upload_= loading([(dcc.Upload([
         }, id = 'upload-file_2')),
         (html.Div(id = 'uploading_2'))])
         
-
         
         
 Youtube_ = loading([dbc.InputGroup(
             [dbc.Input(bs_size="sm", id = 'utube-url_2'), dbc.Button("Submit", color="primary", id = 'utube-button_2', size="sm" )],
             size="sm",
         ),
-
     
     (html.Div(id = 'youtube-display_2'))
-
 ])    
-
-
-
 controls_ = dbc.Jumbotron(
     [
         html.H1("Target Video"),
@@ -1912,8 +1636,6 @@ controls_ = dbc.Jumbotron(
     ]
 )
 #cc =  dbc.Container([dbc.Row([dbc.Col(controls), dbc.Col(controls)])])
-
-
 Upload_Tab = dbc.Row(
             [
                 dbc.Col(controls),#width={"size": 6, "offset": 3}
@@ -1935,9 +1657,6 @@ Training_Tab =  dbc.Row(
               
         )
 ##########print (len(npy_files))
-
-
-
 tabs = html.Div(
     [
         dbc.Tabs(
@@ -1953,8 +1672,6 @@ tabs = html.Div(
         html.Div(id="content"),
     ]
 )
-
-
 modal_error = dbc.Modal(
             [
                 dbc.ModalHeader("Unexpected Error!"),
@@ -1965,17 +1682,7 @@ modal_error = dbc.Modal(
             ],
             id="modal_error",
         )
-
-
-
-
-
-
-
-
-
 app.layout = dbc.Container(
-
     [   html.Br(),
         html.Br(),
         #html.Div(html.Img(src = 'assets/logo.PNG', style = {'height': '200px'}), style ={ 'text-align':'center'}),
@@ -2029,10 +1736,6 @@ app.layout = dbc.Container(
         html.Div(id = 'start_text_continue_', style = {'display': 'none'})                
 ],fluid=True, style = {'width':'60%'}
 )
-
-
-
-
 @app.callback(Output('gpu-error','is_open'), [Input('temp_4', 'children')])        
 def toggle_modal(s): 
     #print (len(GPUs_opts))
@@ -2041,7 +1744,6 @@ def toggle_modal(s):
         return True
     else:
         return False
-
 @app.callback(
     Output("toggle-add-upload", "is_open"),
     [Input("Upload-addclick", "n_clicks")], [State("toggle-add-upload", "is_open")]
@@ -2052,14 +1754,10 @@ def open_toast2(n, is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open
     else:
         return  is_open
-
-
-
 @app.callback(
     Output("Upload-addclick", "active"),
     [Input("toggle-add-upload", "is_open")]
@@ -2070,10 +1768,7 @@ def open_toast2(is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return is_open
-
-
 @app.callback(
     Output("toggle-add-utube", "is_open"),
     [Input("Youtube-addclick", "n_clicks")], [State("toggle-add-utube", "is_open")]
@@ -2084,14 +1779,10 @@ def open_toast2(n, is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open
     else:
         return  is_open
-
-
-
 @app.callback(
     Output("Youtube-addclick", "active"),
     [Input("toggle-add-utube", "is_open")]
@@ -2102,7 +1793,6 @@ def open_toast2(is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return is_open
     
     
@@ -2111,11 +1801,9 @@ def open_toast2(is_open):
     [Input("Record-addclick", "n_clicks")],[State("toggle-add-record", "is_open"), State("Record-addclick", "active")]
 )
 def open_toast3(n, is_open, is_active):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open, not is_active
     else:
@@ -2123,8 +1811,6 @@ def open_toast3(n, is_open, is_active):
         
         
         
-
-
         
 @app.callback(Output('New_modal_','is_open'), [Input('New_workspace', 'n_clicks'), Input('New_modal_Butt', 'n_clicks')], [State("New_modal_", "is_open")],)        
 def toggle_modal(n1, n2, is_open):
@@ -2132,8 +1818,6 @@ def toggle_modal(n1, n2, is_open):
         return not is_open
     return is_open        
         
-
-
         
 @app.callback(Output('Open_modal_','is_open'), [Input('Open_workspace', 'n_clicks'), Input('Open_modal_Butt', 'n_clicks')], [State("Open_modal_", "is_open")],)        
 def toggle_modal(n1, n2, is_open):
@@ -2144,7 +1828,6 @@ def toggle_modal(n1, n2, is_open):
         
 @app.callback([Output('drive_dload_','is_open'), Output('drive_dload_loading','children')], [Input('drive_dload', 'n_clicks'), Input('drive_dload_butt', 'n_clicks')], [State("drive_dload_input", "value")],)        
 def toggle_modal(n1, n2, n3):
-
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     if trigger_id == 'drive_dload.n_clicks':
         return True, ''
@@ -2161,8 +1844,6 @@ def toggle_modal(n1, n2, n3):
     else:
         return dash.no_update, dash.no_update
           
-
-
     
 @app.callback(Output('New_workspace','disabled'), [Input('interval-3', 'n_intervals')])       
 def toggle_modal(n):
@@ -2211,9 +1892,7 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
     files.sort(key=lambda x: os.path.getmtime('/data/'+x))
     
     option_ = []#[{"label": '(1) New Wokspace', "value" : 1}, {"label": '(2) Resume Workspace', "value" : 1}, {"label": '(3) Load Workspace', "value" : 2, 'disabled': True}]
-
     for j,idx in enumerate(files[::-1]):
-
         option_.append({"label": idx , "value" : j+2})
         
     option__1 = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
@@ -2224,7 +1903,6 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         f = open('/tmp/model.txt','w+')
         
         convert_id = f.write('_'.join(start_text_new.split(' ')))
-
         f.close()
         #print (datadir()+'/')
         if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
@@ -2251,7 +1929,6 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         f.close()
         
         counter_children = counter_children + 1
-
         return 1, '1', counter_children, error_modal_no_data
         
     elif trigger_id == 'Open_modal_Butt.n_clicks':
@@ -2294,7 +1971,7 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
             #print ('trigerr')
             #print (start_text_input_)
             counter_children = counter_children + 1
-            print (counter_children)
+            #print (counter_children)
             return start_text_input_, dash.no_update, counter_children, error_modal_no_data
             
         else:
@@ -2305,14 +1982,10 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
  
  
  
-
 '''
-
 New_modal = html.Div([html.Br(),
 dbc.Input(placeholder="Enter Workspace Name", type="start_text_new"),
 html.Br(),
-
-
 dbc.FormGroup([
  
         dbc.Label("Select Mode:"),
@@ -2338,7 +2011,6 @@ dbc.FormGroup([
         ),]
     
 ),
-
  dbc.FormGroup(
     [
         dbc.Label("Select Device:"),
@@ -2350,8 +2022,6 @@ dbc.FormGroup([
         ),
     ]
 ),
-
-
  
  
  
@@ -2371,7 +2041,6 @@ dbc.FormGroup([
  
         
         
-
 @server.route('/video_feed')
 def video_feed():
     global camera 
@@ -2379,14 +2048,11 @@ def video_feed():
     if camera.open:
         return Response(gen(camera),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
-
 @app.callback(
     [Output('rec_button', 'children'),Output("Record-addclick", "n_clicks")],
     [Input('rec_button', 'n_clicks')],
     [State('rec_button', 'children')])
-
 def update_button(n_clicks, butt):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -2397,62 +2063,45 @@ def update_button(n_clicks, butt):
         
         if n_clicks%3==1:
             camera.start()
-
             return 'Stop', 1
-
         elif n_clicks%3==2:
-
             camera.stop()
             return 'Add', 1
-
         elif n_clicks%3==0:
           
         
             copyfile('videos/Source/Record/temp.mp4', 'videos/Source/final/temp'+str(video_index())+'.mp4')
             return 'Added Successfully', 2
-
-
-
         
     else:
         return butt, 0
     
-
     
 @app.callback(
     Output('uploading', 'children'),
     [Input('upload-file', 'contents')])
-
-
 def update_upload(data):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
     
     if data is not None:
         content_type, content_string = data.split(',')
-
         decoded = base64.b64decode(content_string)
         ############print (decoded)
         with open('videos/Source/Upload/temp.mp4', "wb") as fp:
             fp.write(decoded)
         global src_vids
         global HEIGHT
-
         VID = VideoFileClip('videos/Source/Upload/temp.mp4')
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         src_vids.append(VID)
-
         frame = VID.get_frame(0)
-
         frame = imutils.resize(frame, height=64)
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
-
         return html.Div( 
             [html.Hr(), html.Img(id = 'playback', style={
             'width': '100%',
@@ -2464,15 +2113,11 @@ def update_upload(data):
                 step=1,
                 value=[1, 999], marks = {0: '0:00', 1000: get_sec2time(VID.duration)}),
                   html.Div(dbc.Button(["+",  dbc.Badge(str(int(VID.duration)), id = 'n_upload', color="primary", className="ml-1")], id='crop_button', color="light", size="sm",  style = {'margin-top': '-20px', 'font-weight': 'bold'}),style = {'text-align':'center'})])
-
   
-
     
 @app.callback(
     Output('youtube-display', 'children'),
     [Input('utube-button', 'n_clicks')],[State('utube-url', 'value')])
-
-
 def update_youtube(n, url):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
@@ -2498,20 +2143,16 @@ def update_youtube(n, url):
             except:
                 pass
         
-
         global src_vids
         global HEIGHT
-
         VID = VideoFileClip('videos/Source/Youtube/temp.mp4')
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         src_vids.append(VID)
         frame = VID.get_frame(0)
-
         frame = imutils.resize(frame, height=64)
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
         
   
@@ -2528,10 +2169,6 @@ def update_youtube(n, url):
                 value=[1, 999], marks = {0: '0:00', 1000: get_sec2time(VID.duration)}), 
                 html.Div(dbc.Button(['+', dbc.Badge(str(int((VID.duration))), id = 'n_utube', color="primary", className="ml-1")],id='crop_button_utube', 
 color="light", size="sm",  style = {'margin-top': '-20px','font-weight': 'bold'}), style = {'text-align':'center'})])
-
-
-
-
 @app.callback(
     [
       
@@ -2544,20 +2181,15 @@ color="light", size="sm",  style = {'margin-top': '-20px','font-weight': 'bold'}
       Input('Reset-addclick', 'n_clicks'),
       Input('Resetal-addclick', 'n_clicks'),
     ],
-
       [
       State("Reset-addclick", "disabled"),
       State("n_video", "children"),
       State("n_sec_video", "children")]
       )
-
 def update_details(t1, t2, n, n1, s2, s3, s4):
-
   ###print'######################################################')
   ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
   ###print'######################################################')
-
-
   trigger_id = dash.callback_context.triggered[0]['prop_id']
   trgger_value = dash.callback_context.triggered[0]['value']
   global src_vids_clip
@@ -2581,7 +2213,6 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     #tar_vids = []
     
     #shutil.rmtree('videos/Source/Final'); os.mkdir('videos/Source/Final')
-
     ##global thread_list
    
     
@@ -2594,7 +2225,6 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
             
         #if os.path.isdir(datadir()+'/'):
         #    shutil.rmtree(datadir()+'/')
-
         #if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
         #if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
         #if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
@@ -2623,36 +2253,20 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
         
     return  [ True, str(video_index()), str(duration()) + 's', ' ']
   
-
-
   elif trigger_id == 'Reset-addclick.n_clicks':
   
     src_vids_clip = []
     #src_vids = []
     
     #shutil.rmtree('videos/Source/Final'); os.mkdir('videos/Source/Final')
-
     output = 'You have added total ' + str(video_index()) + ' video(s). You can add more videos' 
-
     return  [True, str(video_index()), str(duration()) + 's',  dash.no_update]
-
   elif t1 == 'True' or t2 == 'True':
-
     output = 'You have added total ' + str(video_index()) + ' video(s). You can add more videos' 
     ###########print ('ffff')
-
     return [ False, str(video_index()), str(duration()) + 's', dash.no_update]
-
   else:
     return [s2, s3, s4, dash.no_update]
-
-
-
-
-
-
-
-
 @app.callback(
     [Output('playback_utube', 'src'),
       #Output("Youtube-addclick", "n_clicks"), 
@@ -2662,13 +2276,10 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     [Input('my-range-slider_utube', 'value'), 
       Input('crop_button_utube', 'n_clicks') 
       ],[State('playback_utube', 'src')])
-
 def upload_playback_utube(rang, n_clicks, s):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     global src_vids
     global src_vids_clip
     
@@ -2676,20 +2287,13 @@ def upload_playback_utube(rang, n_clicks, s):
   
     VID = src_vids[-1]
     
-
-
     #cap = cv2.VideoCapture(file)
-
     fps = VID.fps 
-
     T = VID.duration
     #fps = cap.get(cv2.CAP_PROP_FPS)
-
     totalNoFrames = T*fps
-
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     trgger_value = dash.callback_context.triggered[0]['value']
-
   
     if trigger_id == 'crop_button_utube.n_clicks':
         
@@ -2705,24 +2309,16 @@ def upload_playback_utube(rang, n_clicks, s):
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
         VID = VID.subclip(str_time, end_time)
-
-
         #del src_vids[-1]
-
         src_vids_clip.append(VID)
-
       
         
         #cap.release()
         output = 'You have added total ' + str(video_index()) + ' video(s). You can add more videos.' 
-
         length = VID.duration
         ###########print ('jkbdasflsfkafbkasbkfasaskasksbkabkaj' )
         ###########print (length)
-
         return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
         
     else:
         
@@ -2736,24 +2332,14 @@ def upload_playback_utube(rang, n_clicks, s):
             time_n = int(T*rang[0]/1000)
         else:
             time_n = int(T*rang[0]/1000)
-
         slider_prev_instance = rang
-
-
         #cap.set(1, frame_number)
-
         #res, frame = cap.read()
-
         frame = VID.get_frame(time_n)
-
         frame = imutils.resize(frame, height=64)
-
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
-
-
         #frame = cv2.resize(frame, (100, 70),interpolation=cv2.INTER_CUBIC)
-
         ############print (res)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
@@ -2762,9 +2348,6 @@ def upload_playback_utube(rang, n_clicks, s):
         frame = base64.b64encode(frame)
         
         return ['data:image/png;base64,{}'.format(frame.decode()),'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
-
 @app.callback(
     [Output('playback', 'src'), 
       #Output("Upload-addclick", "n_clicks"), 
@@ -2772,9 +2355,7 @@ def upload_playback_utube(rang, n_clicks, s):
       Output("n_upload", "children"),
       Output("my-range-slider", "marks")],
     [Input('my-range-slider', 'value'), Input('crop_button', 'n_clicks')],[State('playback', 'src')])
-
 def upload_playback(rang,n_clicks,s):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -2786,24 +2367,16 @@ def upload_playback(rang,n_clicks,s):
   
     VID = src_vids[-1]
     
-
-
     #cap = cv2.VideoCapture(file)
-
     fps = VID.fps 
-
     T = VID.duration
     #fps = cap.get(cv2.CAP_PROP_FPS)
-
     totalNoFrames = T*fps
     
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     trgger_value = dash.callback_context.triggered[0]['value']
-
   
     if trigger_id == 'crop_button.n_clicks':
-
-
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
         VID = VID.subclip(str_time, end_time)
@@ -2825,36 +2398,18 @@ def upload_playback(rang,n_clicks,s):
             time_n = int(T*rang[0]/1000)
         else:
             time_n = int(T*rang[0]/1000)
-
         slider_prev_instance = rang
         frame = VID.get_frame(time_n)
-
         frame = imutils.resize(frame, height=64)
-
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
-
-
         #frame = cv2.resize(frame, (100, 70),interpolation=cv2.INTER_CUBIC)
-
         ############print (res)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
         length = end_time - str_time
-
         return ['data:image/png;base64,{}'.format(frame.decode()), 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
-
-
-
-
-
-
-
-
 @app.callback(
     Output("toggle-add-upload_2", "is_open"),
     [Input("Upload-addclick_2", "n_clicks")], [State("toggle-add-upload_2", "is_open")]
@@ -2865,14 +2420,10 @@ def open_toast2(n, is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open
     else:
         return  is_open
-
-
-
 @app.callback(
     Output("Upload-addclick_2", "active"),
     [Input("toggle-add-upload_2", "is_open")]
@@ -2883,9 +2434,7 @@ def open_toast2(is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return is_open
-
 @app.callback(
     Output("toggle-add-utube_2", "is_open"),
     [Input("Youtube-addclick_2", "n_clicks")], [State("toggle-add-utube_2", "is_open")]
@@ -2896,14 +2445,10 @@ def open_toast2(n, is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open
     else:
         return  is_open
-
-
-
 @app.callback(
     Output("Youtube-addclick_2", "active"),
     [Input("toggle-add-utube_2", "is_open")]
@@ -2914,25 +2459,20 @@ def open_toast2(is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return is_open
-
     
 @app.callback(
     [Output("toggle-add-record_2", "is_open"), Output("Record-addclick_2", "active")],
     [Input("Record-addclick_2", "n_clicks")],[State("toggle-add-record_2", "is_open"), State("Record-addclick_2", "active")]
 )
 def open_toast3(n, is_open, is_active):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     if n:
         return not is_open, not is_active
     else:
         return  is_open,  is_active
-
 @server.route('/video_feed_')
 def video_feed_():
     global camera 
@@ -2940,14 +2480,11 @@ def video_feed_():
     if camera.open:
         return Response(gen(camera),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
-
 @app.callback(
     [Output('rec_button_2', 'children'),Output("Record-addclick_2", "n_clicks")],
     [Input('rec_button_2', 'n_clicks')],
     [State('rec_button_2', 'children')])
-
 def update_button(n_clicks, butt):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -2958,21 +2495,14 @@ def update_button(n_clicks, butt):
         
         if n_clicks%3==1:
             camera.start()
-
             return 'Stop', 1
-
         elif n_clicks%3==2:
-
             camera.stop()
             return 'Add', 1
-
         elif n_clicks%3==0:
       
             copyfile('videos/Target/Record/temp.mp4', 'videos/Target/final/temp'+str(video_index2())+'.mp4')
             return 'Added Successfully', 2
-
-
-
         
     else:
         return butt, 0
@@ -2993,52 +2523,39 @@ def update_button(n_clicks, butt):
       State("n_sec_video_2", "children")]
       )
 def update_details(t1, t2, n, ss, s2, s3, s4):
-
   ###print'######################################################')
   ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
   ###print'######################################################')
-
   trigger_id = dash.callback_context.triggered[0]['prop_id']
   trgger_value = dash.callback_context.triggered[0]['value']
-
   if trigger_id == 'Reset-addclick_2.n_clicks':
-
     
     #global tar_vids
     #tar_vids = []
     global tar_vids_clip
     tar_vids_clip = []
     #output = 'You have added total ' + str(video_index2()) + ' video(s). You can add more videos' 
-
     return  [True, str(video_index2()), str(duration2()) + 's']
-
   elif t1 == 'True' or t2 == 'True':
-
     #output = 'You have added total ' + str(video_index2()) + ' video(s). You can add more videos' 
     ###########print ('ffff')
-
     return [ False, str(video_index2()), str(duration2()) + 's']
   elif trigger_id == 'Resetal-addclick.n_clicks':
   
     return [ dash.no_update, str(video_index2()), str(duration2()) + 's']
   else:
     return [s2, s3, s4]
-
     
 @app.callback(
     Output('uploading_2', 'children'),
     [Input('upload-file_2', 'contents')])
-
-
 def update_upload(data):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
     
     if data is not None:
         content_type, content_string = data.split(',')
-
         decoded = base64.b64decode(content_string)
         ############print (decoded)
         with open('videos/Target/Upload/temp.mp4', "wb") as fp:
@@ -3046,17 +2563,14 @@ def update_upload(data):
             
         global tar_vids
         global HEIGHT
-
         VID = VideoFileClip('videos/Target/Upload/temp.mp4')
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         tar_vids.append(VID)
         frame = VID.get_frame(0)
-
         frame = imutils.resize(frame, height=64)
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
         
         return html.Div( 
@@ -3071,15 +2585,11 @@ def update_upload(data):
                 value=[1, 999],marks = {0: '0:00', 1000: get_sec2time(VID.duration)}),  html.Div(dbc.Button(['+', dbc.Badge(str(int((VID.duration))), id = 'n_upload_2', color="primary", className="ml-1")], id ='crop_button_2',
                                                                                           color="light", size="sm",  style = {'margin-top': '-20px',  'font-weight': 'bold'}),style = {'text-align':'center'})])
   
-
     
 @app.callback(
     Output('youtube-display_2', 'children'),
     [Input('utube-button_2', 'n_clicks')],[State('utube-url_2', 'value')])
-
-
 def update_youtube(n, url):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -3108,18 +2618,15 @@ def update_youtube(n, url):
               
         global tar_vids
         global HEIGHT
-
         VID = VideoFileClip('videos/Target/Youtube/temp.mp4')
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         tar_vids.append(VID)
         
         frame = VID.get_frame(0)
-
         frame = imutils.resize(frame, height=64)
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
         
         return html.Div( 
@@ -3133,12 +2640,7 @@ def update_youtube(n, url):
                 step=1,
                 value=[1, 999], marks = {0: '0:00', 1000: get_sec2time(VID.duration)}), html.Div(dbc.Button(["+", dbc.Badge(str(int((VID.duration))), id = 'n_utube_2', color="primary", className="ml-1")], id = 'crop_button_utube_2',
                                                                                           color="light", size="sm",  style = {'margin-top': '-20px', 'font-weight': 'bold'}), style = {'text-align':'center'})])
-
-
     
-
-
-
 @app.callback(
     [Output('playback_utube_2', 'src'),
       #Output("Youtube-addclick_2", "n_clicks"), 
@@ -3148,9 +2650,7 @@ def update_youtube(n, url):
     [Input('my-range-slider_utube_2', 'value'), 
       Input('crop_button_utube_2', 'n_clicks')]
       ,[State('playback_utube_2', 'src')])
-
 def upload_playback_utube(rang, n_clicks, s):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -3161,14 +2661,12 @@ def upload_playback_utube(rang, n_clicks, s):
     
   
     VID = tar_vids[-1]
-
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     
     ###########print ('#############################################################################################3')
     ###########print (trigger_id)
     trgger_value = dash.callback_context.triggered[0]['value']
     fps = VID.fps 
-
     T = VID.duration
     totalNoFrames = T*fps
   
@@ -3182,12 +2680,8 @@ def upload_playback_utube(rang, n_clicks, s):
     
         output = 'You have added total ' + str(video_index2()) + ' video(s). You can add more videos' 
         length = VID.duration
-
         
-
         return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
         
     else:
         
@@ -3201,16 +2695,12 @@ def upload_playback_utube(rang, n_clicks, s):
             time_n = int(T*rang[0]/1000)
         else:
             time_n = int(T*rang[0]/1000)
-
         slider_prev_instance2 = rang
         
         frame = VID.get_frame(time_n)
-
         frame = imutils.resize(frame, height=64)
-
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
-
         
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         ret, frame = cv2.imencode('.png', frame)
@@ -3219,9 +2709,6 @@ def upload_playback_utube(rang, n_clicks, s):
         frame = base64.b64encode(frame)
         
         return ['data:image/png;base64,{}'.format(frame.decode()), 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
-
 @app.callback(
     [Output('playback_2', 'src'), 
       #Output("Upload-addclick_2", "n_clicks"), 
@@ -3229,9 +2716,7 @@ def upload_playback_utube(rang, n_clicks, s):
       Output("n_upload_2", "children"),
       Output("my-range-slider_2", "marks")],
     [Input('my-range-slider_2', 'value'), Input('crop_button_2', 'n_clicks')],[State('playback_2', 'src')])
-
 def upload_playback(rang,n_clicks,s):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -3243,26 +2728,19 @@ def upload_playback(rang,n_clicks,s):
   
     VID = tar_vids[-1]
     fps = VID.fps 
-
     T = VID.duration
     #fps = cap.get(cv2.CAP_PROP_FPS)
-
     totalNoFrames = T*fps
     
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     trgger_value = dash.callback_context.triggered[0]['value']
-
   
     if trigger_id == 'crop_button_2.n_clicks':
-
     
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
         VID = VID.subclip(str_time, end_time)
-
-
         #del src_vids[-1]
-
         tar_vids_clip.append(VID)
         
         length = VID.duration
@@ -3282,42 +2760,23 @@ def upload_playback(rang,n_clicks,s):
             time_n = int(T*rang[0]/1000)
         else:
             time_n = int(T*rang[0]/1000)
-
         slider_prev_instance = rang
         frame = VID.get_frame(time_n)
-
         frame = imutils.resize(frame, height=64)
-
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
-
-
         #frame = cv2.resize(frame, (100, 70),interpolation=cv2.INTER_CUBIC)
-
         ############print (res)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         ret, frame = cv2.imencode('.png', frame)
-
         frame = base64.b64encode(frame)
         length = end_time - str_time
-
         return ['data:image/png;base64,{}'.format(frame.decode()),  'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
-
-
-
-
-
-
-
-
-
 @app.callback([Output("preview_imgs", "children"), Output("preview_graph", "children")],
               
     [Input('interval-2', 'n_intervals'),Input('delete-addclick', 'n_clicks'),Input('preview_divs', 'style'), Input('Progress_modal_',"is_open"),])
-
 def update_images(ints,kd,ff,dkkd):
-
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -3336,7 +2795,6 @@ def update_images(ints,kd,ff,dkkd):
     
        
         for i in thread_list:
-
             os.system('kill -9 '+str(i.pid)) 
                 
         if os.path.isdir(datadir()+'/'):
@@ -3353,7 +2811,6 @@ def update_images(ints,kd,ff,dkkd):
         if not os.path.isdir('assets'): os.mkdir('assets')
         
         [os.remove(os.path.join('/tmp',i)) for i in os.listdir('/tmp') if i.endswith('.npy')]
-
         if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
         
         #if not os.path.isfile('/tmp/model.txt'):
@@ -3372,7 +2829,6 @@ def update_images(ints,kd,ff,dkkd):
     elif os.path.isfile('/tmp/model.txt'):
         #print (os.path.isfile('/tmp/model.txt'))
     
-
         jpgs = glob.glob(datadir()+'/model/*.jpg')
         
         ###########print (jpgs)
@@ -3415,16 +2871,10 @@ def update_images(ints,kd,ff,dkkd):
         else:
         
             return ['', '']
-
     else:
         return dash.no_update,dash.no_update
-
     
     
-
-
-
-
 @app.callback(
     Output("Start-click", "active"),
     [Input("toggle-add-Progress", "is_open")]
@@ -3435,7 +2885,6 @@ def open_toast2(is_open):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return is_open
     
 @app.callback(
@@ -3461,17 +2910,12 @@ def open_toast1(n,dd,dlld, kll,loo):
     else:
     
         return False
-
-
-
 @app.callback(
     [Output("status_tooltip", "children"),Output("status_tooltip", "style")],
     [Input("interval-3", "n_intervals")]
 )
 def open_toast1(n):
-
     if os.path.isfile('/tmp/running'):
-
         f = open(datadir()+'/.params', 'r')
         params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
         f.close()
@@ -3501,14 +2945,11 @@ def open_toast1(n):
         
         
 @app.callback(Output("tempvar", "value"), [Input('Start-click', 'n_clicks')])
-
 def update_var(inf):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
-
     return ''
-
         
 @app.callback(Output('refresh__', 'children'),
               [Input('Refresh_error', 'n_clicks')])
@@ -3517,12 +2958,8 @@ def display_page(n):
         shutdown()
     
     
-
-
-
   
 @app.callback( [
-
                 Output('status', 'children'), 
                 #Output("progress_field", "children"),
                 Output("toggle-add-Progress", "header"),
@@ -3549,11 +2986,8 @@ def display_page(n):
     [Input('start_text_continue_', 'children'),Input('interval-1', 'n_intervals'), Input('confirm_delete', 'children'),Input('temp_delete', 'children'), Input('Resetal-addclick', 'n_clicks'),
       Input('delete-addclick', 'n_clicks'), Input('convert_start', 'n_clicks')],
     [State("toggle-add-face", "is_open"), State('start_text_input', 'value'), State("start_text_input", "disabled"), State("face_type_select", "value"), State("interval-1", "interval")])
-
 def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name, d3, s1, s4):
-
 #html.Div([html.Div(id = 'progress_msg'),dbc.Progress(value=0, id="Progress_modal", striped=True, animated = True), html.Div(id = 'choose_face_modal')])
-
   global threadon 
   global msglist
   global storemsg
@@ -3582,19 +3016,16 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   error_modal = dash.no_update
   
   global open_choose_box
-
   trigger_id = dash.callback_context.triggered[0]['prop_id']
   ##print (trigger_id)
   
-
   if os.path.isfile('/tmp/ResourceExhaustedError'):
       error_modal = True
       
   if trigger_id=='convert_start.n_clicks':
     
       os.remove('/tmp/running')
-  print (trigger_id)
-  print (n)
+  
   if n is not None:
   
       global watch
@@ -3641,7 +3072,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
                 
         watch.start()
         ###########print ( 'ddabjhjkasfawbwfbjbkwfbkfabkfbkfafbkkbaf')
-
         threadon = False
         
         start_text_continue_disabled = True
@@ -3650,10 +3080,8 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
         
         #html.Div(dbc.Row([dbc.Col('Training ') , dbc.Col(title_project)], no_gutters = True))
         Progress_header = " Starting..."
-
         
       ##print (threadon_)
-
       #if not threadon_:
       
      #    cols = dash.no_update
@@ -3685,7 +3113,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
             #    img = cv2.imread(labelsdict['src_face_labels'][cli][0])
                 
             ##    ret, frame = cv2.imencode('.png', img)
-
               #   frame = base64.b64encode(frame)
 #
               #   src_imgs.append('data:image/png;base64,{}'.format(frame.decode()))
@@ -3697,9 +3124,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
               #   img = cv2.imread(labelsdict['dst_face_labels'][cli][0])
                 
               #   ret, frame = cv2.imencode('.png', img)
-
             #    frame = base64.b64encode(frame)
-
               #   dst_imgs.append('data:image/png;base64,{}'.format(frame.decode()))    
                 
             ###########print ('#######################################################')
@@ -3752,14 +3177,12 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
             
             
             cols = html.Div([dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_), ]), dbc.Button('Next ', outline=True, id = 'okay_face_select', active=False, color="success",  size = 'sm',  style = {'margin-left': 'auto', 'margin-right': 'auto'})], id = "cols_", style = {'text-align':'center'})
-
             os.remove('/tmp/cluster/labelsdict.npy')
             open_choose_box = True
             threadon_ = False
             
       
       
-
         
         
         
@@ -3773,7 +3196,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       
       if message:
         
-
         ####print'fafas')
         
         #print ('#############################################')
@@ -3789,7 +3211,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
             
       
         
-
      
       #print (os.path.isfile('/tmp/processing'))
       
@@ -3854,13 +3275,10 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   
   
   if os.path.isfile('/tmp/processing'):
-
      f = open('/tmp/processing','r')
      msglist = f.read()
      f.close()
-
      progress_msg = msglist
-
      is_modal_open = True
      
      if msglist != 'Initializing':
@@ -3870,7 +3288,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
        
      else:
          Progress_modal = 0
-
    
   else:    
   
@@ -3908,12 +3325,10 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       display_ =  {"display":"none"}#dash.no_update
       display_1 = {'text-align' : 'none'}
       
-
   try:
        
         tessst = cols
         #del cols
-
   except:
   
         cols = dash.no_update
@@ -3928,18 +3343,14 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   
         f = open('/tmp/model.txt','r')
         convert_id = f.read()
-
         f.close()
     
     except:
-
         convert_id = ''
-
     title_project = html.Div([dbc.Badge([ dbc.Spinner(size="lg", color = 'danger'), ' Training: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
                     
   
     status_children = title_project
-
     try:
     
       header = watch.get_interval()
@@ -3951,7 +3362,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
           itt = '[Iterations : '+iters + '] '
         
       except:
-
           itt = ''
          
         
@@ -3977,13 +3387,10 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   else:
       Progress_header = 'Choose an option'
       status_children = 'Start the Process'
-
         
         
   if trigger_id == 'Resetal-addclick.n_clicks' or trigger_id == 'delete-addclick.n_clicks' or trigger_id == 'convert_start.n_clicks':
-
     
-
     
     start_text_continue_disabled = False
     start_text_input_disabled = False
@@ -3998,10 +3405,6 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   ##print(interval_interval)    
   return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1, is_modal_open,progress_msg, Progress_modal,cols,error_modal]
     
-
-
-
-
 @app.callback([Output('src_face_img', 'src'),Output('src_frames_nos', 'children'), Output('add_src_face', 'disabled'), Output('src_slider', 'max'), Output('src_slider', 'marks')],
             [Input('select_src_face', 'value'), Input('add_src_face', 'n_clicks'), Input('src_slider', 'value')])
             
@@ -4023,7 +3426,6 @@ def update(faceid, n, k):
     try:
         src_img = 'data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png', imutils.resize(cv2.imread(labelsdict['src_face_labels'][int(faceid)][k]), height = 64))[-1]).decode())
     except:
-
         src_img = 'data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png', imutils.resize(cv2.imread(labelsdict['src_face_labels'][int(faceid)][0]), height = 64))[-1]).decode())
         
             
@@ -4087,19 +3489,11 @@ def update(faceid, n, k):
     ##########print (dst_face_list, faceid, isdisabled)
     return dst_img, str(total_dst_frames) + ' frames added', isdisabled, n_frames, {int(n_frames/2):str(n_frames) + ' frames'}
                 
-
-
-
-
-
 @app.callback([Output('confirm_delete', 'children'),Output('okay_face_select_text', 'children'), 
                 Output('okay_face_select_text', 'disabled'), Output('select_src_face', 'disabled'), Output('select_dst_face', 'disabled'), Output('src_slider', 'disabled'),
                 Output('dst_slider', 'disabled'),Output('cols_', 'style')],
               [Input('okay_face_select', 'n_clicks')])
-
-
 def update(n):
-
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     if n and trigger_id == 'okay_face_select.n_clicks':
         global total_dst_frames_paths
@@ -4126,8 +3520,6 @@ def update(n):
                 os.remove(i)  
                 
             shutil.rmtree('/tmp/cluster/')
-
-
             return " ", '', True, True,True,True,True,{"display":"none"}
             
         else:
@@ -4135,15 +3527,10 @@ def update(n):
             
             return dash.no_update, 'Please add frames', dash.no_update, dash.no_update, dash.no_update , dash.no_update, dash.no_update, dash.no_update
     
-
     else:
     
         
         return [dash.no_update]*8
-
-
-
-
     
 @app.callback(Output('Convert_Image', 'src'),
                 [
@@ -4181,11 +3568,9 @@ def update(n):
 def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v_plus_shift, h_minus_shift, h_plus_shift, v_minus_shift, refresh_img,
                           mask_mode_, mode_, Erode_,Blur_ ,color_mode_, motion_blur_power_, blursharpen_amount_,
                         image_denoise_power_,color_degrade_power_,okay_merge, jdkd, default_pre, ori_pre,default_face_pre,  ori_face_pre):
-
     
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     stp_size, stp_shift = 10,10
-
     ##########print (v_plus_size,h_minus_size, h_plus_size, v_minus_size , v_plus_shift, h_minus_shift, h_plus_shift, v_minus_shift,
   
     global horizontal_shear
@@ -4244,9 +3629,7 @@ def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v
     
     
     
-
     try:
-
         npy_ = os.path.join('/tmp', npy_files[ind_preview])
     
         
@@ -4307,7 +3690,6 @@ def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v
             dict_2 = {0: 'None', 1:'rct',2:'lct',3:'mkl',4:'mkl-m',5:'idt',6:'idt-m',7:'sot-m',8:'mix-m'}
             
             with open('DeepFaceLab/settings.py', 'a') as f:
-
                 f.write("\nmerging_mode = "+ str(dict_1[cfg_merge.mode]))
                 f.write("\nmask_merging_mode = " + str(cfg_merge.mask_mode))
                 f.write("\nblursharpen_amount = " + str(cfg_merge.blursharpen_amount))
@@ -4315,15 +3697,10 @@ def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v
                 f.write("\nblur_mask_modifier ="+ str(cfg_merge.blur_mask_modifier))
                 f.write("\nmotion_blur_power = "+ str(cfg_merge.motion_blur_power))
                 #f.write("\noutput_face_scale = "+ cfg_merge)
-
                 if cfg_merge.color_transfer_mode == 0:
-
                   f.write("\ncolor_transfer_mode = None")
-
                 else:
-
                   f.write("\ncolor_transfer_mode = '"+ dict_2[cfg_merge.color_transfer_mode]+"'")
-
                 #f.write("\nsuper_resolution_power = "+ cfg_merge)
                 f.write("\nimage_denoise_power = "+ str(cfg_merge.image_denoise_power))
                 #f.write("\nbicubic_degrade_power = "+ cfg_merge)
@@ -4343,15 +3720,12 @@ def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v
         ##########print (result.shape)
         
         ret, frame = cv2.imencode('.png',result )
-
         frame = base64.b64encode(frame)
-
         src = 'data:image/png;base64,{}'.format(frame.decode())
         
         return src
     
     except:
-
         return ""
   
     
@@ -4361,11 +3735,9 @@ def update_convert_image(v_plus_size,h_minus_size, h_plus_size, v_minus_size , v
             
       
 def update__(interval):
-
     try:
     
         ##print ('f')
-
         number_of_files = len(os.listdir(datadir()+'/preview/merged'))
         total_number_of_files = len(os.listdir(datadir()+'/preview/')) - 3
         
@@ -4407,7 +3779,6 @@ def update__(interval):
         
   
 def update__(nd,ne, interval):
-
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     ModalHeader_convert = dash.no_update
     merge_progress_modal = dash.no_update
@@ -4432,6 +3803,7 @@ def update__(nd,ne, interval):
     if nd and trigger_id=='convert_start.n_clicks':
     
         open('/tmp/converting','w+').close()
+        ModalHeader_convert = 'In Progress'
         #ModalHeader_convert = html.Div([dbc.Badge([ dbc.Spinner(size="lg", color = 'danger'), ' Swaping: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
         killall()
         ##print ('gb')
@@ -4451,7 +3823,6 @@ def update__(nd,ne, interval):
         dict_2 = {0: 'None', 1:'rct',2:'lct',3:'mkl',4:'mkl-m',5:'idt',6:'idt-m',7:'sot-m',8:'mix-m'}
         
         with open('DeepFaceLab/settings.py', 'a') as f:
-
             f.write("\nmerging_mode = "+ str(dict_1[cfg_merge.mode]))
             f.write("\nmask_merging_mode = " + str(cfg_merge.mask_mode))
             f.write("\nblursharpen_amount = " + str(cfg_merge.blursharpen_amount))
@@ -4459,15 +3830,10 @@ def update__(nd,ne, interval):
             f.write("\nblur_mask_modifier ="+ str(cfg_merge.blur_mask_modifier))
             f.write("\nmotion_blur_power = "+ str(cfg_merge.motion_blur_power))
             #f.write("\noutput_face_scale = "+ cfg_merge)
-
             if cfg_merge.color_transfer_mode == 0:
-
               f.write("\ncolor_transfer_mode = None")
-
             else:
-
               f.write("\ncolor_transfer_mode = '"+ dict_2[cfg_merge.color_transfer_mode]+"'")
-
             #f.write("\nsuper_resolution_power = "+ cfg_merge)
             f.write("\nimage_denoise_power = "+ str(cfg_merge.image_denoise_power))
             #f.write("\nbicubic_degrade_power = "+ cfg_merge)
@@ -4491,9 +3857,9 @@ def update__(nd,ne, interval):
         thr.start()
         merge_progress_modal = True
         
-        return 0, ["[1/2] Loading frames ", ]   , merge_progress_modal, {'display':'none'}, ModalHeader_convert
+        return 0, ["Loading video frames", ]   , merge_progress_modal, {'display':'none'}, ModalHeader_convert
     
-    if nd and trigger_id=='interval-1.n_intervals':
+    if  os.path.isfile('/tmp/converting'):
     
         try:
         
@@ -4507,13 +3873,11 @@ def update__(nd,ne, interval):
             
         
             if os.path.isfile(tar_di):
-
                 #time.sleep(10)
             
                 #fid = getoutput("xattr -p 'user.drive.id' '"+tar_di+"'")
                 
                 done = 100
-
                 
                 done_ = [html.Br(),"Goto path "+tar_di+' to play it']
                 
@@ -4522,11 +3886,11 @@ def update__(nd,ne, interval):
        
             
             else:
-                done_ =  [ "[2/2] Swaping faces "]   
+                done_ =  [ "Please wait until we finish the swaping process"]   
                 sty =  {'display':'none'}
                 
             
-            #merge_progress_modal = os.path.isfile('/tmp/converting')
+            merge_progress_modal = os.path.isfile('/tmp/converting')
             
             
             return done,done_, merge_progress_modal, sty, ModalHeader_convert
@@ -4534,13 +3898,13 @@ def update__(nd,ne, interval):
         except:
             pass
             
-    #merge_progress_modal = os.path.isfile('/tmp/converting')
+    merge_progress_modal = os.path.isfile('/tmp/converting')
     
     return 0, "", merge_progress_modal, {'display':'none'}, ModalHeader_convert
     
     
 if __name__ == '__main__':
     
+    
     app.run_server(debug=False, port =  4000, host = '0.0.0.0')
-
 #gunicorn app:server -b 0.0.0.0:8080
