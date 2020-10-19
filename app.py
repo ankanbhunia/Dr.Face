@@ -965,7 +965,7 @@ for j,idx in enumerate(files_[::-1]):
                 option_import.append({"label": '/data/'+idx , "value" : cx})
                 cx  = cx + 1
 #print (option_import)
-
+option_drive_ = []
 if IN_COLAB_DRIVE:
     zipfiles = os.listdir(os.path.join(drive_path,'Dr.Face'))
     option_drive = []

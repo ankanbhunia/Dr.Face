@@ -58,7 +58,7 @@ if not os.path.isfile('/tmp/done'):
      
 
   print ('['+gpu+']'+' Please wait for few minutes... ')
-  get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git foo; mv foo/* foo/.git* .; rmdir foo; gdown --id 1--UDEnzTkjwN9W1nQhc6Ux2BH6xzGSNJ; tar -xvf drfacelib.tar.gz; rm drfacelib.tar.gz; touch /tmp/done')
+  get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git foo; mv foo/* foo/.git* .; rmdir foo; gdown --id 1b3F9dTc2gLXhIsm1rt6FVxqQY8VJEbDV; tar -xvf drfacelib.tar.gz; rm drfacelib.tar.gz; touch /tmp/done')
   get_ipython().system_raw('sudo apt-get install -y xattr')
 
 clear_output()
