@@ -93,7 +93,10 @@ if os.path.isfile('/tmp/processing'): os.remove('/tmp/processing')
 if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaustedError')
 if os.path.isfile('/tmp/converting'): os.remove('/tmp/converting')
 if os.path.isfile('/tmp/start'): os.remove('/tmp/start')
+if os.path.isfile('/tmp/shutdown'): os.remove('/tmp/shutdown')
+
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
+
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
@@ -955,10 +958,13 @@ files_ = os.listdir('/data')
 
 global option_import  
 option_import = []
+cx = 1
 for j,idx in enumerate(files_[::-1]):
         if os.path.isdir(os.path.join('/data',idx,'model')):
             if len(os.listdir(os.path.join('/data',idx,'model')))>4:
-                option_import.append({"label": '/data/'+idx , "value" : j+2})
+                option_import.append({"label": '/data/'+idx , "value" : cx})
+                cx  = cx + 1
+#print (option_import)
 
 if IN_COLAB_DRIVE:
     zipfiles = os.listdir(os.path.join(drive_path,'Dr.Face'))
@@ -1426,7 +1432,7 @@ Convert_Tab =  html.Div([dbc.Card(
         ),
         html.Br(),
         
-        html.Div(dbc.Button('Swap Full Video', id = 'convert_start', size = 'sm', active=True, color="light"), style = {'text-align' : 'center'}),
+        
 #html.Br(),    
 #dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_)], justify = 'center')
   
@@ -1472,7 +1478,7 @@ dbc.Container(
 ],
 fluid=True,
 )
-right_frame = dbc.Tabs(
+right_frame = html.Div([dbc.Tabs(
             [
                 dbc.Tab(Preview_vid, label="Preview", tab_id="Preview_vid"),
                 dbc.Tab(Convert_Tab, label="Settings", tab_id="Convert_Tab"),
@@ -1481,7 +1487,8 @@ right_frame = dbc.Tabs(
             ],
             id="convert_tabs_1",
             active_tab="Preview_vid",
-        )
+        ),
+        html.Div(dbc.Button('Swap Full Video', id = 'convert_start', size = 'sm', active=True, color="light"), style = {'text-align' : 'right'}),])
 #dbc.Row([dbc.Col(html.Button('Button 1', id='btn-nclicks-1')), dbc.Col(html.Button('Button 2', id='btn-nclicks-2'))], justify = 'center')
 #dbc.ButtonGroup(
 #            [dbc.Button(outline=True, id = 'convert_settings', active=False, disabled = False, color="success", className="fas fa-hourglass-start"),
@@ -1512,7 +1519,7 @@ controls_start = dbc.Jumbotron(
         html.H1("Start the Process", id  = 'status'),
     dbc.Tooltip( id = 'status_tooltip',
             target="status",
-            placement = 'left'
+            placement = 'right'
         ),
         html.Br(),
         dbc.ButtonGroup(
@@ -1755,8 +1762,7 @@ navbar = dbc.NavbarSimple(
 )        
         
 main_panel = dbc.Container(
-    [   #html.Br(),
-        
+    [   
         
         #navbar,
         #html.H1([dbc.Badge("Dr.",  pill=True,color ='success',className="ml-1"),'face'],  style=font_style,),
@@ -1812,18 +1818,29 @@ main_panel = dbc.Container(
 ],fluid=True, #style = {'width':'60%'}
 )
 
+logo_tooltip = dbc.ButtonGroup([dbc.Button(outline=True,external_link =True,href  = 'https://github.com/ankanbhunia/Dr.Face', id = 'github_id', color="primary", className="fab fa-github"),
+dbc.Button(outline=True, id = 'docker_id', external_link =True,href  = 'https://github.com/ankanbhunia/Dr.Face', color="primary", className="fab fa-docker"),
+dbc.Button(outline=True, id = 'power_id', color="danger", className="fas fa-power-off"),
+dbc.Tooltip('Visit Docker page',target = 'docker_id'),
+dbc.Tooltip('Visit GitHub page',target = 'github_id'),
+dbc.Tooltip('Shutdown the program', target = 'power_id')], className="mr-1"),
 
 
 
 app.layout = dbc.Modal(
             [
-                dbc.ModalHeader(dbc.Row(
+                dbc.ModalHeader([dbc.Row(
             [
-                dbc.Col(html.Div(html.Img(src = '/assets/logo.svg', style = {'height':'48px'}))),
-               # dbc.Col('stop', ),
+                dbc.Col(html.Div(html.Img(src = '/assets/logo.svg', id = 'logo-img', style = {'height':'42px'}))),
+                
+                #dbc.Col(('stop', style = {'margin-right':'10px'})),
             ],
-            justify="between",
-        )),
+         #   justify="between",
+        ),
+        
+        dbc.Tooltip(logo_tooltip  ,target = 'logo-img',autohide = False,style = {'background-color':'#FFFFFF'},placement = 'right')
+        
+           ]),
                 dbc.ModalBody(main_panel),
                 
             ],
@@ -1835,20 +1852,37 @@ app.layout = dbc.Modal(
             scrollable=True,
           
         )
+@app.callback(Output('main_panel','style'), [Input('power_id', 'n_clicks')])    
+def update(n):
+    if n:
+        open('/tmp/shutdown','w+').close()
+        return {'display':'none'}
+    else:
+        return dash.no_update
 
-@app.callback([Output('option_import_select','options'), Output('select_train_scratch','options')], [Input('interval-3', 'n_intervals')])        
+@app.callback([Output('option_import_select','options'), Output('select_train_scratch','options')], [Input('interval-3', 'n_intervals')])    
+
+
+    
 def toggle_modal(s): 
     global option_import  
     option_import = []
     
     files_ = os.listdir('/data')
+    
+    if os.path.isfile('/tmp/shutdown'): 
+        print ('ddd')
+        #quit()
+        os.system('pkill -9 python')
 
-
+    #print (option_import)
+    cx = 1
     for j,idx in enumerate(files_[::-1]):
-        if os.path.isdir(os.path.join('/data',idx,'model')):
-            if len(os.listdir(os.path.join('/data',idx,'model')))>4:
-                option_import.append({"label": '/data/'+idx , "value" : j+1})
-            
+            if os.path.isdir(os.path.join('/data',idx,'model')):
+                if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                    option_import.append({"label": '/data/'+idx , "value" : cx})
+                    cx  = cx + 1
+                
     if len(option_import)>0:
         ll = [{'label' : 'Training from scratch', 'value' : '0'}, {'label' : 'Import a model', 'value' : '1'}]
         
@@ -2034,7 +2068,26 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         #print (start_text_new)
         f = open('/tmp/model.txt','w+')
         
-        convert_id = f.write('_'.join(start_text_new.split(' ')))
+        alphanumeric = ''
+
+        for character in start_text_new.strip():
+            if character.isalnum():
+                alphanumeric += character
+            if character == '_':
+                alphanumeric += character
+            if character == ' ':
+                alphanumeric += '_'
+        c = 1
+        alphanumeric_ = alphanumeric
+        while 1:
+          if alphanumeric_ in os.listdir('/data'):
+              alphanumeric_ = alphanumeric + '_'+str(c)
+              c=c+1
+          else:
+              break
+        start_text_new = alphanumeric_
+        convert_id = alphanumeric_
+        f.write('_'.join(start_text_new.split(' ')))       
         f.close()
         #print (datadir()+'/')
         if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
@@ -2055,12 +2108,15 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         
             files_ = os.listdir('/data')
         
-            option_import = []
+            cx = 1
             for j,idx in enumerate(files_[::-1]):
-                if os.path.isdir(os.path.join('/data',idx,'model')):
-                    if len(os.listdir(os.path.join('/data',idx,'model')))>4:
-                        option_import.append({"label": '/data/'+idx , "value" : j+1})
-        
+                    if os.path.isdir(os.path.join('/data',idx,'model')):
+                        if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                            option_import.append({"label": '/data/'+idx , "value" : cx})
+                            cx  = cx + 1
+            #print (option_import)
+            #print (option_import_select)
+            #print (type(option_import_select))
             model_pretrained = [i['label'] for i in option_import if i['value'] == int(option_import_select)][0]
             #print (model_pretrained)
             
