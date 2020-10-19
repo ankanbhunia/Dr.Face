@@ -77,8 +77,16 @@ for face_frames_path in [datadir()+"/data_src/aligned/", datadir()+"/data_dst/al
     n_total_files = len(extracted_face_paths)
 
     mode = settings.Face_Type
-
-    for img_path in extracted_face_paths: 
+    f = open('/tmp/ProgressN','w+')
+    f.write(str(n_total_files))
+    f.close()
+    ccc = 0
+    for img_path in extracted_face_paths:
+    
+      ff = open('/tmp/ProgressI','w+')
+      ff.write(str(ccc))
+      ff.close()
+      ccc=ccc+1
 
       img = resize(imageio.imread(img_path), (256, 256))[..., :3]
 
@@ -100,3 +108,6 @@ for face_frames_path in [datadir()+"/data_src/aligned/", datadir()+"/data_dst/al
         pass
       
       dflimg.save()
+      
+    if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
+    if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')

@@ -93,6 +93,8 @@ if os.path.isfile('/tmp/processing'): os.remove('/tmp/processing')
 if os.path.isfile('/tmp/ResourceExhaustedError'): os.remove('/tmp/ResourceExhaustedError')
 if os.path.isfile('/tmp/converting'): os.remove('/tmp/converting')
 if os.path.isfile('/tmp/start'): os.remove('/tmp/start')
+if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
+if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')
 if os.path.isfile('/tmp/shutdown'): os.remove('/tmp/shutdown')
 
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
@@ -849,7 +851,7 @@ server = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 app = dash.Dash(__name__, server=server, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, "https://use.fontawesome.com/releases/v5.7.2/css/all.css"])
-app.title = 'dr.face'
+app.title = 'Dr.face | Create Deepfakes'
 app.update_title = None
 server = app.server
 global slider_prev_instance 
@@ -1098,7 +1100,7 @@ dbc.FormGroup(
     ]
 )
 ])
-Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(),dbc.Progress(value=0, id="Progress_modal", striped=True, animated = True)])
+Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "10px", 'display':'none'}, striped=True, animated = True),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
 Progress =  html.Div([html.Div([dbc.Button(' New',outline=False, id = 'New_workspace',  active=False, disabled = True, color="light", className="fas fa-plus",),
 dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled = False,color="light", className="fas fa-redo")], id = 'start_buttons', style = {'text-align' : 'center', 'color':'blue'})
@@ -1535,8 +1537,8 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
         
         
         
-        dbc.Row([dbc.Col(dbc.Toast(Progress, id="toggle-add-Progress",header="Getting Started",is_open=True,icon="primary",dismissable=True,  style={"maxWidth": "1000px"})),
-        dbc.Col(dbc.Toast(right_frame, id="toggle-add-right_frame",header=""+sec_s,is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "1000px"}))], no_gutters=True,),
+        dbc.Row([dbc.Col(dbc.Toast(Progress, id="toggle-add-Progress",header="Getting Started",is_open=True,icon="primary",dismissable=False,  style={"maxWidth": "1000px"})),
+        dbc.Col(dbc.Toast(right_frame, id="toggle-add-right_frame",header=""+sec_s,is_open=False,icon="primary",dismissable=False,  style={"maxWidth": "1000px"}))], no_gutters=True,),
     
         
         #dbc.Toast(Images, id="toggle-add-Images",header="Generated Images",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "800px"}),
@@ -1678,8 +1680,8 @@ controls_ = dbc.Jumbotron(
             className="mr-1"),
             
         html.Hr(className="my-2"),
-        dbc.Toast(upload_, id="toggle-add-upload_2",header="Upload your Video",is_open=False,icon="primary",dismissable=False,  style={"maxWidth": "500px"}),
-        dbc.Toast(Youtube_, id="toggle-add-utube_2",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=False,  style={"maxWidth": "500px"}),
+        dbc.Toast(upload_, id="toggle-add-upload_2",header="Upload your Video",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
+        dbc.Toast(Youtube_, id="toggle-add-utube_2",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
         #dbc.Toast(record, id="toggle-add-record_2",header="Record your own Video",is_open=False,icon="primary",dismissable=False),
         #html.Hr(className="my-2"),
         #html.P("You haven\'t added any videos here. Let\'s add one. You have the option to add video by Upload, Youtube or Webcam", id = 'output_text_2')
@@ -1823,7 +1825,7 @@ dbc.Button(outline=True, id = 'docker_id', external_link =True,href  = 'https://
 dbc.Button(outline=True, id = 'power_id', color="danger", className="fas fa-power-off"),
 dbc.Tooltip('Visit Docker page',target = 'docker_id'),
 dbc.Tooltip('Visit GitHub page',target = 'github_id'),
-dbc.Tooltip('Shutdown the program', target = 'power_id')], className="mr-1"),
+dbc.Tooltip('Shutdown', target = 'power_id')], className="mr-1"),
 
 
 
@@ -3195,7 +3197,9 @@ def display_page(n):
          Output('progress_msg',"children"),
           Output('Progress_modal',"value"),
           Output('choose_face_modal',"children"),
-          Output('error_modal', 'is_open')
+          Output('error_modal', 'is_open'),
+          Output('Progress_modal_tqdm', 'value'),
+          Output('Progress_modal_tqdm', 'style')
                 ],
               
     [Input('start_text_continue_', 'children'),Input('interval-1', 'n_intervals'), Input('confirm_delete', 'children'),Input('temp_delete', 'children'), Input('Resetal-addclick', 'n_clicks'),
@@ -3214,6 +3218,9 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   ##global thread_list
   global threadon_
   global no_loop
+  Progress_modal_tqdm_value = 0
+     	
+  Progress_modal_tqdm_style = {"height": "10px", 'display':'none'}
   ##print (thread_list)
   ##print (len(thread_list))
   #is_modal_open = dash.no_update
@@ -3496,7 +3503,26 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   if os.path.isfile('/tmp/processing'):
      f = open('/tmp/processing','r')
      msglist = f.read()
-     f.close()
+
+     try:
+
+     	f = open('/tmp/ProgressN','r')
+
+     	NN = int(f.read())
+     	#print (NN)
+     	f = open('/tmp/ProgressI','r')
+     	II = int(f.read())
+     	#print (II)
+
+     	f.close()
+     	
+     	Progress_modal_tqdm_value = int(II*100/NN)
+     	
+     	Progress_modal_tqdm_style = {"height": "10px", 'display':''}
+     	
+     	
+     except:
+     	pass
      progress_msg = msglist
      is_modal_open = True
      
@@ -3620,9 +3646,8 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
     display_ = {'text-align' : 'center'}
     display_1 = {"display":"none"}
         
-          
-  ##print(interval_interval)    
-  return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1, is_modal_open,progress_msg, Progress_modal,cols,error_modal]
+    
+  return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1, is_modal_open,progress_msg, Progress_modal,cols,error_modal, Progress_modal_tqdm_value, Progress_modal_tqdm_style]
     
 @app.callback([Output('src_face_img', 'src'),Output('src_frames_nos', 'children'), Output('add_src_face', 'disabled'), Output('src_slider', 'max'), Output('src_slider', 'marks')],
             [Input('select_src_face', 'value'), Input('add_src_face', 'n_clicks'), Input('src_slider', 'value')])

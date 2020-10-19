@@ -147,21 +147,30 @@ class InteractBase(object):
         else: print("capture_keys: named_window ", wnd_name, " not found.")
 
     def progress_bar(self, desc, total, leave=True, initial=0):
-        if self.pg_bar is None:
-            self.pg_bar = tqdm( total=total, desc=desc, leave=leave, ascii=True, initial=initial )
-        else: print("progress_bar: already set.")
+    	f = open('/tmp/ProgressN','w+')
+    	f.write(str(total))
+    	f.close()
+    	if self.pg_bar is None:
+    		self.pg_bar = tqdm( total=total, desc=desc, leave=leave, ascii=True, initial=initial )
+    	else: print("progress_bar: already set.")
 
     def progress_bar_inc(self, c):
-        if self.pg_bar is not None:
-            self.pg_bar.n += c
-            self.pg_bar.refresh()
-        else: print("progress_bar not set.")
+    	
+    	if self.pg_bar is not None:
+    		self.pg_bar.n += c
+    		f = open('/tmp/ProgressI','w+')
+    		f.write(str(self.pg_bar.n))
+    		f.close()
+    		self.pg_bar.refresh()
+    	else: print("progress_bar not set.")
 
     def progress_bar_close(self):
-        if self.pg_bar is not None:
-            self.pg_bar.close()
-            self.pg_bar = None
-        else: print("progress_bar not set.")
+    	os.remove('/tmp/ProgressN')
+    	os.remove('/tmp/ProgressI')
+    	if self.pg_bar is not None:
+    		self.pg_bar.close()
+    		self.pg_bar = None
+    	else: print("progress_bar not set.")
 
     def progress_bar_generator(self, data, desc=None, leave=True, initial=0):
         self.pg_bar = tqdm( data, desc=desc, leave=leave, ascii=True, initial=initial )

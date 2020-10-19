@@ -28,8 +28,16 @@ def Get_face_clustered_labels(faces_folder_path):
     # Load the images from input folder
 
     FACE_PATHS  = []
-
-    for f in tqdm(glob.glob(os.path.join(faces_folder_path, "*.jpg"))):
+    dn = glob.glob(os.path.join(faces_folder_path, "*.jpg"))
+    f = open('/tmp/ProgressN','w+')
+    f.write(str(len(dn)))
+    f.close()
+    ccc = 1
+    for f in tqdm(dn):
+        ff = open('/tmp/ProgressI','w+')
+        ff.write(str(ccc))
+        ff.close()
+        ccc = ccc + 1
         #print("Processing file: {}".format(f))
         img = dlib.load_rgb_image(f)
 
@@ -77,6 +85,9 @@ def Get_face_clustered_labels(faces_folder_path):
             face_label_dicts[j] = [i]
             
     #print ('xxxxxx')	
+    
+    if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
+    if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')
     del detector
     del sp
     del facerec
