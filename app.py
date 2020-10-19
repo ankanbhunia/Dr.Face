@@ -97,7 +97,7 @@ if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
-parser = argparse.ArgumentParser(description='FakeLab Options')
+parser = argparse.ArgumentParser(description='dr.face Options')
 parser.add_argument('drivepath', type=str, nargs='?',
                     help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
 argss = parser.parse_args()
@@ -542,7 +542,13 @@ def Main(q, option_id):
             print ('Analyzing target faces')
             labelsdict['dst_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_dst/aligned')
             
+            
+            
             np.save('/tmp/cluster/labelsdict.npy', labelsdict) 
+            
+            if len(labelsdict['src_face_labels']) >1 or len(labelsdict['dst_face_labels']) >1:
+                q.put  ('[8/12] Mutiple person detected. Manually add faces to continue.')
+                put_msg('[8/12] Mutiple person detected. Manually add faces to continue.')
             
             from numba import cuda 
             device = cuda.get_current_device()
@@ -739,7 +745,13 @@ def Main(q, option_id):
             print ('Analyzing target faces')
             labelsdict['dst_face_labels'] = ffc.Get_face_clustered_labels(datadir()+'/data_dst/aligned')
             
+            
+                
             np.save('/tmp/cluster/labelsdict.npy', labelsdict) 
+            
+            if len(labelsdict['src_face_labels']) >1 or len(labelsdict['dst_face_labels']) >1:
+                q.put  ('[8/12] Mutiple person detected. Manually add faces to continue.')
+                put_msg('[8/12] Mutiple person detected. Manually add faces to continue.')
             
             from numba import cuda 
             device = cuda.get_current_device()
@@ -834,7 +846,7 @@ server = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 app = dash.Dash(__name__, server=server, update_title=None, external_stylesheets=[dbc.themes.BOOTSTRAP, "https://use.fontawesome.com/releases/v5.7.2/css/all.css"])
-app.title = 'FakeLab'
+app.title = 'dr.face'
 app.update_title = None
 server = app.server
 global slider_prev_instance 
@@ -937,6 +949,17 @@ for j,idx in enumerate(files[::-1]):
     option_.append({"label": idx , "value" : j+2})
     
 option__ = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
+
+
+files_ = os.listdir('/data')
+
+global option_import  
+option_import = []
+for j,idx in enumerate(files_[::-1]):
+        if os.path.isdir(os.path.join('/data',idx,'model')):
+            if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                option_import.append({"label": '/data/'+idx , "value" : j+2})
+
 if IN_COLAB_DRIVE:
     zipfiles = os.listdir(os.path.join(drive_path,'Dr.Face'))
     option_drive = []
@@ -950,10 +973,33 @@ if n_options == 0:
     
 else:
     ow_disabled = False
+    
+
+if len(option_import)>0:
+    ll = [{'label' : 'Training from scratch', 'value' : '0'}, {'label' : 'Import a model', 'value' : '1'}]
+    
+else:
+    ll =  [{'label' : 'Training from scratch', 'value' : '0'}, {'label' : 'Import a model', 'value' : '1', 'disabled':True}]
+        
+        
 GPUs_opts = [{"label":'CPU', "value":'C'}]+[{"label": i.name+' ['+str(int(i.memoryTotal))+' MB]',"value": i.id} for i in  GPUtil.getGPUs()]
 New_modal = html.Div([html.Br(),
 dbc.Input(placeholder="Enter Workspace Name", id="start_text_new"),
 html.Br(),
+
+dbc.FormGroup([
+ 
+        dbc.Label("Select Training Type:"),
+        dbc.RadioItems(
+            options=ll,
+            value='0',
+            id="select_train_scratch",
+            inline=True,
+        ),]),
+        
+        html.Div([dbc.Select(id = 'option_import_select', options = option_import, value = 1), html.Br(),  html.Br()], id = 'option_import_select_div',style = {'display':'none'}),
+        
+
 dbc.FormGroup([
  
         dbc.Label("Select Mode:"),
@@ -962,7 +1008,7 @@ dbc.FormGroup([
             value='1',
             id="select_mode",
             inline=True,
-        ),]),
+        ),], id = "select_mode_form"),
         
  dbc.FormGroup([
  
@@ -977,9 +1023,9 @@ dbc.FormGroup([
             value=2,
             id="select_resolution",
             inline=True,
-        ),]
+        ),],
     
-),
+id = "select_resolution_form"),
  dbc.FormGroup(
     [
         dbc.Label("Select Device:"),
@@ -1683,10 +1729,38 @@ modal_error = dbc.Modal(
             ],
             id="modal_error",
         )
-app.layout = dbc.Container(
-    [   html.Br(),
-        html.Br(),
-        #html.Div(html.Img(src = 'assets/logo.PNG', style = {'height': '200px'}), style ={ 'text-align':'center'}),
+        
+font_style = {
+'font-family': "Comic Sans MS",
+'font-size': '31px',
+'letter-spacing': '0.4px',
+'word-spacing': '2px',
+'color': '#000000',
+'font-weight': '700',
+'text-decoration': 'none',
+'font-style':'normal',
+'font-variant': 'normal',
+'text-transform': 'none',
+'height' :'45px',
+"text-align":"center"
+}
+
+navbar = dbc.NavbarSimple(
+    
+    style = font_style,
+    brand="Dr.face",
+    brand_href="#",
+    color="light",
+   # dark=True,
+)        
+        
+main_panel = dbc.Container(
+    [   #html.Br(),
+        
+        
+        #navbar,
+        #html.H1([dbc.Badge("Dr.",  pill=True,color ='success',className="ml-1"),'face'],  style=font_style,),
+        #html.Br(),
        
         tabs,
         
@@ -1735,8 +1809,65 @@ app.layout = dbc.Container(
         html.Div(id = 'temp_delete', style = {'display': 'none'})    ,   
         html.Div(id = 'temp_4', style = {'display': 'none'})  ,
         html.Div(id = 'start_text_continue_', style = {'display': 'none'})                
-],fluid=True, style = {'width':'60%'}
+],fluid=True, #style = {'width':'60%'}
 )
+
+
+
+
+app.layout = dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.Row(
+            [
+                dbc.Col(html.Div(html.Img(src = '/assets/logo.svg', style = {'height':'48px'}))),
+               # dbc.Col('stop', ),
+            ],
+            justify="between",
+        )),
+                dbc.ModalBody(main_panel),
+                
+            ],
+            id="main_panel",
+            centered=True,
+            is_open = True,
+            backdrop= 'static',
+            style={"maxWidth": "1000px"},
+            scrollable=True,
+          
+        )
+
+@app.callback([Output('option_import_select','options'), Output('select_train_scratch','options')], [Input('interval-3', 'n_intervals')])        
+def toggle_modal(s): 
+    global option_import  
+    option_import = []
+    
+    files_ = os.listdir('/data')
+
+
+    for j,idx in enumerate(files_[::-1]):
+        if os.path.isdir(os.path.join('/data',idx,'model')):
+            if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                option_import.append({"label": '/data/'+idx , "value" : j+1})
+            
+    if len(option_import)>0:
+        ll = [{'label' : 'Training from scratch', 'value' : '0'}, {'label' : 'Import a model', 'value' : '1'}]
+        
+    else:
+        ll =  [{'label' : 'Training from scratch', 'value' : '0'}, {'label' : 'Import a model', 'value' : '1', 'disabled':True}]
+        
+    return option_import, ll
+
+
+@app.callback([Output('option_import_select_div','style'), Output('select_mode_form','style'), Output('select_resolution_form','style')], [Input('select_train_scratch', 'value')])        
+def toggle_modal(s): 
+    #print (len(GPUs_opts))
+    if s == '1':
+    
+        return {'display':''}, {'display':'none'}, {'display':'none'}
+        
+    else:
+        return  {'display':'none'}, {'display':''},{'display':''}
+        
 @app.callback(Output('gpu-error','is_open'), [Input('temp_4', 'children')])        
 def toggle_modal(s): 
     #print (len(GPUs_opts))
@@ -1878,9 +2009,9 @@ def toggle_modal(n):
                         
 @app.callback( [Output('start_text_input', 'value'), Output('face_type_select', 'value'), Output('start_text_continue_', 'children'), Output('error_modal_no_data', 'is_open'),],
 [Input('New_modal_Butt', 'n_clicks'), Input('Open_modal_Butt', 'n_clicks'), ],
-[State('select_mode', 'value'),State('select_resolution', 'value'),State('select_device_', 'value'), State('select_device', 'value'), State('select_Batchsize_', 'value'), State('select_Batchsize', 'value'), State('start_text_input_','value'), State('start_text_new','value')] )     
+[State('select_mode', 'value'),State('select_resolution', 'value'),State('select_device_', 'value'), State('select_device', 'value'), State('select_Batchsize_', 'value'), State('select_Batchsize', 'value'), State('start_text_input_','value'), State('start_text_new','value'), State('option_import_select','value'), State('select_train_scratch','value')] )     
         
-def update(n1,n2,select_mode,select_resolution, select_device_, select_device, select_Batchsize_,select_Batchsize,start_text_input_, start_text_new):
+def update(n1,n2,select_mode,select_resolution, select_device_, select_device, select_Batchsize_,select_Batchsize,start_text_input_, start_text_new, option_import_select, select_train_scratch):
     global option_
     global counter_children
     
@@ -1919,11 +2050,52 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
         if type(select_device) == list: select_device = ','.join([str(i) for i in select_device])
         #print (select_device)
         #print ('asknksafnklkl')
+        
+        if select_train_scratch == '1':
+        
+            files_ = os.listdir('/data')
+        
+            option_import = []
+            for j,idx in enumerate(files_[::-1]):
+                if os.path.isdir(os.path.join('/data',idx,'model')):
+                    if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                        option_import.append({"label": '/data/'+idx , "value" : j+1})
+        
+            model_pretrained = [i['label'] for i in option_import if i['value'] == int(option_import_select)][0]
+            #print (model_pretrained)
+            
+            f = open(os.path.join(model_pretrained, '.params'), 'r')
+            params_ = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+            f.close()
+            def copy_tree_(a,b):
+                from distutils.dir_util import copy_tree
+                a_i = [i for i in os.listdir(a) if not i.endswith('.jpg')]
+                for i in a_i:
+                    try:
+                        copyfile(os.path.join(a,i), os.path.join(b,i))
+                    except:
+                        copy_tree(os.path.join(a,i), os.path.join(b,i))
+            #copy_tree(os.path.join(model_pretrained, 'model'), datadir()+'/model')
+            thr8 = Process(target = copy_tree_, args=(os.path.join(model_pretrained, 'model'), datadir()+'/model',))
+            thr8.daemon = True
+            thr8.start()
+            
+            
+            
         f = open(datadir()+'/.params', 'w+')
-        #print ('****************')
-        #print (select_mode)
-        f.write('facetype '+str(select_mode)+'\n')
-        f.write('Quality '+str(select_resolution)+'\n')
+        
+        
+        
+        #print ('sknsfknfesnkenf')
+        if select_train_scratch == '1':
+        
+            f.write('facetype '+str(params_['facetype'])+'\n')
+            f.write('Quality '+str(params_['Quality'])+'\n')
+            
+        else:
+            f.write('facetype '+str(select_mode)+'\n')
+            f.write('Quality '+str(select_resolution)+'\n')
+            
         f.write('device '+str(select_device)+'\n')
         f.write('Batchsize '+str(select_Batchsize)+'\n')
         f.write('suggest_batch_size '+str(0)+'\n')
@@ -2210,50 +2382,30 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     
     src_vids_clip = []
     
-    #src_vids = []
     
     tar_vids_clip = []
     
-    #tar_vids = []
-    
-    #shutil.rmtree('videos/Source/Final'); os.mkdir('videos/Source/Final')
-    ##global thread_list
+
    
+    def sfv():
+        for i in thread_list:
+            os.system('kill -9 '+str(i.pid)+'> /dev/null 2>&1')
+            #i.terminate()
+
+        killall()
+        for filename in glob.glob("/tmp/*npy"):os.remove(filename)
+        if os.path.isdir(datadir()+'/data_dst/merged'):
+            shutil.rmtree(datadir()+'/data_dst/merged')
+            os.mkdir (datadir()+'/data_dst/merged')
+        #shutdown() 
+        if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
+        time.sleep(1)
     
-    for i in thread_list:
-        os.system('kill -9 '+str(i.pid)+'> /dev/null 2>&1')
-        #i.terminate()
-        
-    
-    
-            
-        #if os.path.isdir(datadir()+'/'):
-        #    shutil.rmtree(datadir()+'/')
-        #if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
-        #if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-        #if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
-        #if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
-            
-    #threading.Thread(target=resetall, args=(), daemon=True).start()
-    
-    
-    #os.system("for i in $( lsof /dev/nvidia0 | grep python  | awk '{#print $2}' | sort -u); do kill -9 $i; done")
-    
-    
-    # with open('/tmp/log.txt', 'r') as f:
-    #     pids = [i[:-1] for i in f.readlines()] 
-    #     f.close()
-    
-    ##########print (pids)
-    killall()
-    for filename in glob.glob("/tmp/*npy"):os.remove(filename)
-    if os.path.isdir(datadir()+'/data_dst/merged'):
-        shutil.rmtree(datadir()+'/data_dst/merged')
-        os.mkdir (datadir()+'/data_dst/merged')
-    #shutdown() 
-    if os.path.isfile('/tmp/running'): os.remove('/tmp/running')
-    time.sleep(1)
-    
+    thr5 = Process(target = sfv, args=())
+    thr5.daemon = True
+    thr5.start()
+
+
         
     return  [ True, str(video_index()), str(duration()) + 's', ' ']
   
@@ -2532,6 +2684,7 @@ def update_details(t1, t2, n, ss, s2, s3, s4):
   ###print'######################################################')
   trigger_id = dash.callback_context.triggered[0]['prop_id']
   trgger_value = dash.callback_context.triggered[0]['value']
+  #if trigger_id == 'Resetal-addclick.n_clicks': print ('abc3')
   if trigger_id == 'Reset-addclick_2.n_clicks':
     
     #global tar_vids
@@ -2896,10 +3049,12 @@ def open_toast2(is_open):
     [Input("interval-3", "n_intervals"), Input('Resetal-addclick', 'n_clicks'), Input('delete-addclick', 'n_clicks'), Input('New_modal_Butt', 'n_clicks'), Input('Open_modal_Butt', 'n_clicks'),]
 )
 def open_toast1(n,dd,dlld, kll,loo):
+    
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
     trigger_id = dash.callback_context.triggered[0]['prop_id']
+    #if trigger_id == 'Resetal-addclick.n_clicks': print ('abc1')
     #if trigger_id == 'New_modal_Butt.n_clicks' or trigger_id == 'Open_modal_Butt.n_clicks':
      #   if os.path.isfile('/tmp/converting'): 
       #      os.remove('/tmp/converting')
@@ -2991,6 +3146,7 @@ def display_page(n):
       Input('delete-addclick', 'n_clicks'), Input('convert_start', 'n_clicks')],
     [State("toggle-add-face", "is_open"), State('start_text_input', 'value'), State("start_text_input", "disabled"), State("face_type_select", "value"), State("interval-1", "interval")])
 def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name, d3, s1, s4):
+  
 #html.Div([html.Div(id = 'progress_msg'),dbc.Progress(value=0, id="Progress_modal", striped=True, animated = True), html.Div(id = 'choose_face_modal')])
   global threadon 
   global msglist
@@ -3021,6 +3177,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   
   global open_choose_box
   trigger_id = dash.callback_context.triggered[0]['prop_id']
+  #if trigger_id == 'Resetal-addclick.n_clicks': print ('abc2')
   ##print (trigger_id)
   
   if os.path.isfile('/tmp/ResourceExhaustedError'):
@@ -3181,7 +3338,8 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
             
             
             
-            cols = html.Div([dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_), ]), dbc.Button('Next ', outline=True, id = 'okay_face_select', active=False, color="success",  size = 'sm',  style = {'margin-left': 'auto', 'margin-right': 'auto'})], id = "cols_", style = {'text-align':'center'})
+            cols = html.Div([dbc.Row([dbc.Col(src_child_), dbc.Col(dst_child_), ]), html.Br(), dbc.Button('Next ', id = 'okay_face_select', active=False, color="light",  size = 'sm',  style = {'margin-left': 'auto', 'margin-right': 'auto'}),
+                            dbc.Tooltip('Add to Source profile', target="add_src_face"),dbc.Tooltip('Add to Target profile', target="add_dst_face"),], id = "cols_", style = {'text-align':'center'})
             os.remove('/tmp/cluster/labelsdict.npy')
             open_choose_box = True
             threadon_ = False
