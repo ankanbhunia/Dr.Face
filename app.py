@@ -96,12 +96,15 @@ if os.path.isfile('/tmp/start'): os.remove('/tmp/start')
 if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
 if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')
 if os.path.isfile('/tmp/shutdown'): os.remove('/tmp/shutdown')
+if os.path.isfile('/tmp/downloaddrive'): os.remove('/tmp/downloaddrive')
 
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 
 for filename in glob.glob("assets/*.mp4"):os.remove(filename)
 global show_mode
 show_mode = 1
+
+if not os.path.isdir('/data'): os.mkdir('/data')
 parser = argparse.ArgumentParser(description='dr.face Options')
 parser.add_argument('drivepath', type=str, nargs='?',
                     help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
@@ -342,7 +345,7 @@ def Convert():
     if not os.path.isdir(datadir()+'/data_dst/merged_mask'): os.mkdir(datadir()+'/data_dst/merged_mask')
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py merge --input-dir '+datadir()+'/data_dst --output-dir '+datadir()+'/data_dst/merged --output-mask-dir '+datadir()+'/data_dst/merged_mask --aligned-dir '+datadir()+'/data_dst/aligned --model-dir '+datadir()+'/model --model SAEHD')
     os.system('echo | '+PYTHON_PATH+' DeepFaceLab/main.py videoed video-from-sequence --input-dir '+datadir()+'/data_dst/merged --output-file '+datadir()+'/'+output_name+' --reference-file '+datadir()+'/data_dst.mp4 --include-audio')
-    #os.system('cp '+datadir()+'/'+output_name+' /data')
+    os.system('mv '+datadir()+'/'+output_name+' '+datadir()+'/'+convert_id + '_swap.mp4')
     
     
     for filename in glob.glob("/tmp/*npy"):os.remove(filename)
@@ -518,16 +521,16 @@ def Main(q, option_id):
                 
                 
                 
-            q.put  ('[6/12] Creating Source-face-profile')
-            put_msg('[6/12] Creating Source-face-profile')
+            q.put  ('[6/12] Extracting faces for Source profile')
+            put_msg('[6/12] Extracting faces for Source profile')
             
             p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Source faces! '); return False
             
             
-            q.put  ('[7/12] Creating Target-face-profile')
-            put_msg('[7/12] Creating Target-face-profile')
+            q.put  ('[7/12] Extracting faces for Target profile')
+            put_msg('[7/12] Extracting faces for Target profile')
             
             p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
             
@@ -722,16 +725,16 @@ def Main(q, option_id):
                 
                 
                 
-            q.put  ('[4/10] Creating Source-face-profile')
-            put_msg('[4/10] Creating Source-face-profile')
+            q.put  ('[4/10] Extracting faces for Source profile')
+            put_msg('[4/10] Extracting faces for Source profile')
             
             p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_src --output-dir "+datadir()+"/data_src/aligned --detector s3fd", shell=True).wait()
             
             if p!= 0: q.put('Error while extracting Source faces! '); return False
             
             
-            q.put  ('[5/10] Creating Target-face-profile')
-            put_msg('[5/10] Creating Target-face-profile')
+            q.put  ('[5/10] Extracting faces for Target profile')
+            put_msg('[5/10] Extracting faces for Target profile')
             
             p = subprocess.Popen("echo | "+PYTHON_PATH+" DeepFaceLab/main.py extract --input-dir "+datadir()+"/data_dst --output-dir "+datadir()+"/data_dst/aligned --detector s3fd", shell=True).wait()
             
@@ -1100,9 +1103,9 @@ dbc.FormGroup(
     ]
 )
 ])
-Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "10px", 'display':'none'}, striped=True, animated = True),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
+Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "7px", 'display':'none'},),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
-Progress =  html.Div([html.Div([dbc.Button(' New',outline=False, id = 'New_workspace',  active=False, disabled = True, color="light", className="fas fa-plus",),
+Progress =  html.Div([html.Div([dbc.Button(' New',outline=False, id = 'New_workspace',  active=False, disabled = False, color="light", className="fas fa-plus",),
 dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled = False,color="light", className="fas fa-redo")], id = 'start_buttons', style = {'text-align' : 'center', 'color':'blue'})
 ,dbc.Modal(
             [
@@ -1151,9 +1154,9 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
         ),
         
         dbc.Modal(    
-            [   dcc.Loading(html.Div(id="drive_dload_loading"), type='dot', fullscreen=True, style={'opacity': 0.8}),
+            [  html.Div(id="drive_dload_loading"),
                 dbc.ModalHeader("Download Workspace from Drive"),
-                dbc.ModalBody([dbc.Select(id = 'drive_dload_input', options = option_drive_, value = 1)]),
+                dbc.ModalBody([dbc.Select(id = 'drive_dload_input', options = option_drive_, value = 1), dbc.Progress(id = 'drive_dload_progress', style = {'height':'10px'})]),
                 dbc.ModalFooter(
                     dbc.Button(
                         "Download", id="drive_dload_butt", className="ml-auto", disabled = False
@@ -1568,7 +1571,7 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
         ), 
         dcc.Interval(
             id='interval-4',
-            interval=500, # in milliseconds
+            interval=5000, # in milliseconds
             n_intervals=0
         ),
         
@@ -1992,33 +1995,95 @@ def toggle_modal(n1, n2, is_open):
     if n1 or n2:
         return not is_open
     return is_open        
+
         
         
-@app.callback([Output('drive_dload_','is_open'), Output('drive_dload_loading','children')], [Input('drive_dload', 'n_clicks'), Input('drive_dload_butt', 'n_clicks')], [State("drive_dload_input", "value")],)        
+@app.callback([Output('drive_dload_','is_open'), Output('drive_dload_loading','children'), ], [Input('drive_dload', 'n_clicks'), Input('drive_dload_butt', 'n_clicks')], [State("drive_dload_input", "value")],)        
 def toggle_modal(n1, n2, n3):
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     if trigger_id == 'drive_dload.n_clicks':
         return True, ''
         
+    
+        
     if trigger_id == 'drive_dload_butt.n_clicks':
         model = [i['label'] for i in option_drive if i['value'] == int(n3)][0]
         filep = os.path.join(drive_path, 'Dr.Face', model)
         print ('\nExtracting files... '+ filep)
-        import zipfile
-        with zipfile.ZipFile(filep, 'r') as zip_ref:
-            zip_ref.extractall('/')
-        print ('Completed\n')
-        return False, ''
+        
+        def svg(filep):
+        
+            
+        
+       
+            import zipfile
+
+            zf = zipfile.ZipFile(filep)
+
+            uncompress_size = sum((file.file_size for file in zf.infolist()))
+            ff = open('/tmp/ProgressN','w+')
+            ff.write(str(len(zf.infolist())))
+            ff.close()
+            extracted_size = 0
+            for idsx,file in enumerate(zf.infolist()):
+                ff = open('/tmp/ProgressI','w+')
+                ff.write(str(idsx))
+                ff.close()
+                extracted_size += file.file_size
+                #print "%s %%" % (extracted_size * 100/uncompress_size)
+                zf.extract(file, '/')
+                
+            if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
+            if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')
+                
+            os.remove('/tmp/downloaddrive')
+                
+                
+                
+        thr5 = Process(target = svg, args=(filep,))
+        thr5.daemon = True
+        thr5.start()
+        open('/tmp/downloaddrive', 'w+').close()
+        
+        
+        return os.path.isfile('/tmp/downloaddrive'), ''
     else:
-        return dash.no_update, dash.no_update
+        return os.path.isfile('/tmp/downloaddrive'), dash.no_update
           
     
-@app.callback(Output('New_workspace','disabled'), [Input('interval-3', 'n_intervals')])       
-def toggle_modal(n):
-    if len(tar_vids_clip)>0 and len(src_vids_clip)>0 :
-        return False
+@app.callback([Output('drive_dload_progress', 'value'), Output('drive_dload_butt','style'), Output('drive_dload_','backdrop'), Output('drive_dload_progress', 'style')], [Input('interval-4', 'n_intervals'),Input('drive_dload_butt', 'n_clicks')])       
+def toggle_modal(n,kk):
+
+
+    
+    try:
+        f = open('/tmp/ProgressN','r')
+
+        NN = int(f.read())
+        f.close()
+        f = open('/tmp/ProgressI','r')
+        II = int(f.read())
+        #print (II)
+
+        f.close() 
+        
+        vll = int(II*100/NN)
+    except:
+        vll = dash.no_update
+        
+    if os.path.isfile('/tmp/downloaddrive'): 
+        styl = {'display':'none'}
+        sty2 = {'display':''}
+        backdrop = 'static'
     else:
-        return True
+        backdrop = True
+        styl = {'display':''}
+        sty2 = {'display':'none'}
+        #vll = 0
+    #if len(tar_vids_clip)>0 and len(src_vids_clip)>0 :
+    #    return False, vll, styl
+    #else:
+    return  vll, styl, backdrop,sty2
         
 @app.callback(Output('start_text_input_','options'), [Input('interval-1', 'n_intervals')])       
 def toggle_modal(n):
@@ -2050,7 +2115,7 @@ def toggle_modal(n):
 def update(n1,n2,select_mode,select_resolution, select_device_, select_device, select_Batchsize_,select_Batchsize,start_text_input_, start_text_new, option_import_select, select_train_scratch):
     global option_
     global counter_children
-    
+    [os.remove(os.path.join('/tmp',i)) for i in os.listdir('/tmp') if i.endswith('.npy')]
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     
     if trigger_id=='New_modal_Butt.n_clicks' or  trigger_id=='Open_modal_Butt.n_clicks': print ('\nStarting... \n')
@@ -2066,104 +2131,110 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
     option__1 = [{"label":'/data/'+i["label"]  + ' - modified '+get_timeago('/data/'+i["label"] ), "value":i["value"]} for i in option_]
         
     if trigger_id == 'New_modal_Butt.n_clicks':
-        if start_text_new == None or start_text_new.strip() == '': start_text_new = 'Untitled'
-        #print (start_text_new)
-        f = open('/tmp/model.txt','w+')
         
-        alphanumeric = ''
+        if len(src_vids_clip)>0 and len(tar_vids_clip)>0:
+    
+            if start_text_new == None or start_text_new.strip() == '': start_text_new = 'Untitled'
+            #print (start_text_new)
+            f = open('/tmp/model.txt','w+')
+            
+            alphanumeric = ''
 
-        for character in start_text_new.strip():
-            if character.isalnum():
-                alphanumeric += character
-            if character == '_':
-                alphanumeric += character
-            if character == ' ':
-                alphanumeric += '_'
-        c = 1
-        alphanumeric_ = alphanumeric
-        while 1:
-          if alphanumeric_ in os.listdir('/data'):
-              alphanumeric_ = alphanumeric + '_'+str(c)
-              c=c+1
-          else:
-              break
-        start_text_new = alphanumeric_
-        convert_id = alphanumeric_
-        f.write('_'.join(start_text_new.split(' ')))       
-        f.close()
-        #print (datadir()+'/')
-        if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
-        
-        if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
-        if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-        if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
-        if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
-        if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
-        #if not os.path.isdir(datadir()+'/params'): os.mkdir(datadir()+'/params')
-        for filename in glob.glob("assets/*.mp4"):os.remove(filename)
-        if not os.path.isdir('assets'): os.mkdir('assets')
-        if type(select_device) == list: select_device = ','.join([str(i) for i in select_device])
-        #print (select_device)
-        #print ('asknksafnklkl')
-        
-        if select_train_scratch == '1':
-        
-            files_ = os.listdir('/data')
-        
-            cx = 1
-            for j,idx in enumerate(files_[::-1]):
-                    if os.path.isdir(os.path.join('/data',idx,'model')):
-                        if len(os.listdir(os.path.join('/data',idx,'model')))>4:
-                            option_import.append({"label": '/data/'+idx , "value" : cx})
-                            cx  = cx + 1
-            #print (option_import)
-            #print (option_import_select)
-            #print (type(option_import_select))
-            model_pretrained = [i['label'] for i in option_import if i['value'] == int(option_import_select)][0]
-            #print (model_pretrained)
-            
-            f = open(os.path.join(model_pretrained, '.params'), 'r')
-            params_ = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+            for character in start_text_new.strip():
+                if character.isalnum():
+                    alphanumeric += character
+                if character == '_':
+                    alphanumeric += character
+                if character == ' ':
+                    alphanumeric += '_'
+            c = 1
+            alphanumeric_ = alphanumeric
+            while 1:
+              if alphanumeric_ in os.listdir('/data'):
+                  alphanumeric_ = alphanumeric + '_'+str(c)
+                  c=c+1
+              else:
+                  break
+            start_text_new = alphanumeric_
+            convert_id = alphanumeric_
+            f.write('_'.join(start_text_new.split(' ')))       
             f.close()
-            def copy_tree_(a,b):
-                from distutils.dir_util import copy_tree
-                a_i = [i for i in os.listdir(a) if not i.endswith('.jpg')]
-                for i in a_i:
-                    try:
-                        copyfile(os.path.join(a,i), os.path.join(b,i))
-                    except:
-                        copy_tree(os.path.join(a,i), os.path.join(b,i))
-            #copy_tree(os.path.join(model_pretrained, 'model'), datadir()+'/model')
-            thr8 = Process(target = copy_tree_, args=(os.path.join(model_pretrained, 'model'), datadir()+'/model',))
-            thr8.daemon = True
-            thr8.start()
+            #print (datadir()+'/')
+            if os.path.isdir(datadir()+'/'):shutil.rmtree(datadir()+'/')
+            
+            if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
+            if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
+            if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
+            if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
+            if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
+            #if not os.path.isdir(datadir()+'/params'): os.mkdir(datadir()+'/params')
+            for filename in glob.glob("assets/*.mp4"):os.remove(filename)
+            if not os.path.isdir('assets'): os.mkdir('assets')
+            if type(select_device) == list: select_device = ','.join([str(i) for i in select_device])
+            #print (select_device)
+            #print ('asknksafnklkl')
+            
+            if select_train_scratch == '1':
+            
+                files_ = os.listdir('/data')
+            
+                cx = 1
+                for j,idx in enumerate(files_[::-1]):
+                        if os.path.isdir(os.path.join('/data',idx,'model')):
+                            if len(os.listdir(os.path.join('/data',idx,'model')))>4:
+                                option_import.append({"label": '/data/'+idx , "value" : cx})
+                                cx  = cx + 1
+                #print (option_import)
+                #print (option_import_select)
+                #print (type(option_import_select))
+                model_pretrained = [i['label'] for i in option_import if i['value'] == int(option_import_select)][0]
+                #print (model_pretrained)
+                
+                f = open(os.path.join(model_pretrained, '.params'), 'r')
+                params_ = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+                f.close()
+                def copy_tree_(a,b):
+                    from distutils.dir_util import copy_tree
+                    a_i = [i for i in os.listdir(a) if not i.endswith('.jpg')]
+                    for i in a_i:
+                        try:
+                            copyfile(os.path.join(a,i), os.path.join(b,i))
+                        except:
+                            copy_tree(os.path.join(a,i), os.path.join(b,i))
+                #copy_tree(os.path.join(model_pretrained, 'model'), datadir()+'/model')
+                thr8 = Process(target = copy_tree_, args=(os.path.join(model_pretrained, 'model'), datadir()+'/model',))
+                thr8.daemon = True
+                thr8.start()
+                
+                
+                
+            f = open(datadir()+'/.params', 'w+')
             
             
             
-        f = open(datadir()+'/.params', 'w+')
-        
-        
-        
-        #print ('sknsfknfesnkenf')
-        if select_train_scratch == '1':
-        
-            f.write('facetype '+str(params_['facetype'])+'\n')
-            f.write('Quality '+str(params_['Quality'])+'\n')
+            #print ('sknsfknfesnkenf')
+            if select_train_scratch == '1':
+            
+                f.write('facetype '+str(params_['facetype'])+'\n')
+                f.write('Quality '+str(params_['Quality'])+'\n')
+                
+            else:
+                f.write('facetype '+str(select_mode)+'\n')
+                f.write('Quality '+str(select_resolution)+'\n')
+                
+            f.write('device '+str(select_device)+'\n')
+            f.write('Batchsize '+str(select_Batchsize)+'\n')
+            f.write('suggest_batch_size '+str(0)+'\n')
+            f.close()
+            
+            counter_children = counter_children + 1
+            
+            open('/tmp/start','w+').close()
+            return 1, '1', counter_children, error_modal_no_data
             
         else:
-            f.write('facetype '+str(select_mode)+'\n')
-            f.write('Quality '+str(select_resolution)+'\n')
             
-        f.write('device '+str(select_device)+'\n')
-        f.write('Batchsize '+str(select_Batchsize)+'\n')
-        f.write('suggest_batch_size '+str(0)+'\n')
-        f.close()
-        
-        counter_children = counter_children + 1
-        
-        open('/tmp/start','w+').close()
-        return 1, '1', counter_children, error_modal_no_data
-        
+            return dash.no_update, dash.no_update,  dash.no_update, True
     elif trigger_id == 'Open_modal_Butt.n_clicks':
     
         model = [i['label'] for i in option_ if i['value'] == int(start_text_input_)][0]
@@ -3219,8 +3290,8 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   global threadon_
   global no_loop
   Progress_modal_tqdm_value = 0
-     	
-  Progress_modal_tqdm_style = {"height": "10px", 'display':'none'}
+         
+  Progress_modal_tqdm_style = {"height": "7px", 'display':'none'}
   ##print (thread_list)
   ##print (len(thread_list))
   #is_modal_open = dash.no_update
@@ -3504,25 +3575,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
      f = open('/tmp/processing','r')
      msglist = f.read()
 
-     try:
-
-     	f = open('/tmp/ProgressN','r')
-
-     	NN = int(f.read())
-     	#print (NN)
-     	f = open('/tmp/ProgressI','r')
-     	II = int(f.read())
-     	#print (II)
-
-     	f.close()
-     	
-     	Progress_modal_tqdm_value = int(II*100/NN)
-     	
-     	Progress_modal_tqdm_style = {"height": "10px", 'display':''}
-     	
-     	
-     except:
-     	pass
+     
      progress_msg = msglist
      is_modal_open = True
      
@@ -3533,6 +3586,29 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
        
      else:
          Progress_modal = 0
+         
+     try:
+
+         f = open('/tmp/ProgressN','r')
+
+         NN = int(f.read())
+         f.close()
+         f = open('/tmp/ProgressI','r')
+         II = int(f.read())
+         #print (II)
+
+         f.close()
+         
+         Progress_modal_tqdm_value = int(II*100/NN)
+         
+         Progress_modal_tqdm_style = {"height": "7px", 'display':''}
+         aa = msglist.split(']')
+         progress_msg = aa[0] + '] ['+str(II)+'/'+str(NN)+']'+aa[1]
+         
+     except:
+         pass    
+         
+     
    
   else:    
   
@@ -4034,7 +4110,7 @@ def update__(nd,ne, interval):
         f = open('/tmp/model.txt','r')
         convert_id = f.read()
         f.close()
-        tar_di = os.path.join(datadir(), convert_id + '.mp4')
+        tar_di = os.path.join(datadir(), convert_id + '_swap.mp4')
         ##print (nd)
     
     if ne and trigger_id=='merge_progress_exit.n_clicks':
@@ -4130,10 +4206,13 @@ def update__(nd,ne, interval):
        
             
             else:
-                done_ =  [ "Please wait until we finish the swaping process"]   
-                sty =  {'display':'none'}
-                
             
+                if done>0:
+                    done_ =  [ "Please wait until we finish the swaping process"]   
+                    sty =  {'display':'none'}
+                else:
+                    done_ =  [ "Loading video frames"]   
+                    sty =  {'display':'none'}
             merge_progress_modal = os.path.isfile('/tmp/converting')
             
             

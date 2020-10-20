@@ -61,8 +61,8 @@ def visualize_segmentation(image, network, supervised=True, hard=True, colormap=
 
     full_mask = mask
 
-    only_face_area = 1 - mask[:,:,0] - mask[:,:,16] - mask[:,:,17]- mask[:,:,14] # excluding neck , dress, and hair
-    full_head_area = 1 - mask[:,:,0] - mask[:,:,16] - mask[:,:,14] # face + hair
+    only_face_area = 1 - mask[:,:,0] - mask[:,:,16] - mask[:,:,17] - mask[:,:,14] - mask[:,:,15] - mask[:,:,18] - mask[:,:,7]- mask[:,:,8] -mask[:,:,9] # excluding neck , dress, and hair
+    full_head_area = 1 - mask[:,:,0] - mask[:,:,16] - mask[:,:,14] - mask[:,:,15] - mask[:,:,18]  - mask[:,:,7]- mask[:,:,8] -mask[:,:,9] # face + hair
     
     return 0.3 * image + 0.7 * color_mask, color_mask, full_mask, only_face_area, full_head_area
     
