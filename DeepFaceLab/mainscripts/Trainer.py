@@ -137,6 +137,7 @@ def trainerThread (s2c, c2s, e,
                         
                         
                         loss_history = model.get_loss_history()
+                        
                         time_str = time.strftime("[%H:%M:%S]")
                         if iter_time >= 10:
                             loss_string = "{0}[#{1:06d}][{2:.5s}s]".format ( time_str, iter, '{:0.4f}'.format(iter_time) )
@@ -164,8 +165,13 @@ def trainerThread (s2c, c2s, e,
                                 io.log_info (loss_string, end='\r')
 
                         if model.get_iter() == 100:
+                            
                             model_save()
 
+                        if model.get_iter()%10 == 0:
+
+                          np.save(datadir()+'/model/loss_history.npy',np.round(loss_history,2))
+                          
                         if model.get_target_iter() != 0 and model.is_reached_iter_goal():
                             io.log_info ('Reached target iteration.')
                             model_save()
@@ -321,7 +327,7 @@ def main(**kwargs):
                         loss_history_to_show = loss_history
                     else:
                         loss_history_to_show = loss_history[-show_last_history_iters_count:]
-
+                    #print (loss_history_to_show)
                     lh_img = models.ModelBase.get_loss_history_preview(loss_history_to_show, iter, w, c)
                     
                     final = np.concatenate ( [final, lh_img], axis=0 )

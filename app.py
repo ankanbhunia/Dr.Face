@@ -1,6 +1,7 @@
 from importlib import reload  
 import zipfile
 import tqdm
+import plotly.graph_objs as go
 from subprocess import getoutput
 import imutils
 import dash
@@ -145,6 +146,100 @@ def exit_handler():
     #print('\nCompleted.')
     
     if not IN_COLAB: os.system('fuser -k /usr/bin/python3.6')
+
+def update_graph_loss(
+    graph_id,
+    graph_title,
+    y_train_index,
+    y_val_index,
+    run_log_json,
+    display_mode,
+    checklist_smoothing_options,
+    slider_smoothing,
+    yaxis_title,
+):
+    """
+    :param graph_id: ID for Dash callbacks
+    :param graph_title: Displayed on layout
+    :param y_train_index: name of column index for y train we want to retrieve
+    :param y_val_index: name of column index for y val we want to retrieve
+    :param run_log_json: the json file containing the data
+    :param display_mode: 'separate' or 'overlap'
+    :param checklist_smoothing_options: 'train' or 'val'
+    :param slider_smoothing: value between 0 and 1, at interval of 0.05
+    :return: dcc Graph object containing the updated figures
+    """
+
+    def smooth(scalars, weight=0.6):
+        last = scalars[0]
+        smoothed = list()
+        for point in scalars:
+            smoothed_val = last * weight + (1 - weight) * point
+            smoothed.append(smoothed_val)
+            last = smoothed_val
+        return smoothed
+
+    if run_log_json:
+        layout = go.Layout(
+            autosize=True,
+           
+            height=180,
+            margin=go.layout.Margin(l=0, r=0, b=0, t=0),
+            #yaxis={"title": yaxis_title},
+        )
+        #print (datadir())
+        #run_log_df = pd.read_json(run_log_json, orient="split")
+        data_stream = np.load(datadir()+'/model/loss_history.npy',allow_pickle='TRUE')
+        number_of_points = len(data_stream)
+
+        start_point = number_of_points//100
+        #print (start_point, number_of_points)
+        sparse_idx = np.arange(0,number_of_points-start_point,number_of_points//5000 + 1)
+        step = np.arange(start_point,number_of_points)[sparse_idx]
+        
+        y_train = data_stream[start_point:number_of_points,0][sparse_idx]
+        y_val =data_stream[start_point:number_of_points,1][sparse_idx]
+
+        if "train" in checklist_smoothing_options:
+            y_train = smooth(y_train, weight=.4)
+
+        if "val" in checklist_smoothing_options:
+            y_val = smooth(y_val, weight=.4)
+
+        trace_train_ = go.Scatter(
+            x=step,
+            y=y_train,
+            mode="lines",
+            name="loss I",
+            opacity = .7,
+            line=dict(color="rgb(54, 218, 170)"),
+            showlegend=False,
+        )
+
+        trace_val_ = go.Scatter(
+            x=step,
+            y=y_val,
+            mode="lines",
+            name="loss II",
+            opacity = .7,
+            line=dict(color="rgb(255, 87, 51 )"),
+            showlegend=False,
+        )
+
+    
+
+        
+
+        
+        figure = go.Figure(data=[trace_train_, trace_val_], layout=layout)
+
+        figure.update_layout(yaxis={'visible': False, 'showticklabels': False})
+
+       # print ('finish')
+        return dcc.Graph(figure=figure, id=graph_id)
+
+    return dcc.Graph(id=graph_id)
+
     
     
 if not IN_COLAB: atexit.register(exit_handler)
@@ -1224,7 +1319,7 @@ dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled 
             size="sm",
         ), style = {'display':'none'}),
         
-        html.Div([html.Br(), html.Div(id = 'preview_graph'), html.Br(),html.Div(id = 'preview_imgs'),dbc.Progress(id = 'preview_progress', style={"height": "6px"})], id= 'preview_divs', style = {'display':'none'})])
+        html.Div([html.Div( id = 'preview_graph'), html.Br(),html.Div(id = 'preview_imgs'),dbc.Progress(id = 'preview_progress', style={"height": "6px"})], id= 'preview_divs', style = {'display':'none'})])
         
        
 #dbc.InputGroup(
@@ -1521,14 +1616,15 @@ choose_face = html.Div([html.Div(id = 'all_imgs_faces'), html.Br(),
 html.Div(id = 'okay_face_select_text')])
 controls_start = dbc.Jumbotron(
     [
-        html.H1("Start the Process", id  = 'status'),
-    dbc.Tooltip( id = 'status_tooltip',
+        html.Div(html.H1("Dashboard"),id  = 'status'),
+
+        dbc.Tooltip( id = 'status_tooltip',
             target="status",
             placement = 'right'
         ),
         html.Br(),
         dbc.ButtonGroup(
-            [dbc.Button(outline=True, id = 'Start-click', active=False, disabled = False, color="success", className="fas fa-hourglass-start"),
+            [dbc.Button(outline=True, id = 'Start-click', active=True, disabled = False, color="success", className="fas fa-hourglass-start"),
 #dbc.Button(outline=True, id = 'Images-addclick', active=False,disabled = True, color="primary", className="fas fa-image"),
 #dbc.Button(outline=True, id = 'Settings-addclick', active=False,disabled = False, color="primary", className="fas fa-users-cog"),
 dbc.Button(outline=True, id = 'Resetal-addclick', active=False, disabled = False, color="danger", className="fas fa-power-off"),
@@ -1575,7 +1671,7 @@ dbc.Button(outline=True, id = 'delete-addclick', active=False, disabled = False,
             n_intervals=0
         ),
         
-    dbc.Tooltip('Start the process', target="Start-click"),
+    dbc.Tooltip('Dashboard', target="Start-click"),
     #dbc.Tooltip('Show generated results', target="Images-addclick"),
     dbc.Tooltip('Stop training', target="Resetal-addclick"),
     dbc.Tooltip('Delete workspace and model', target="delete-addclick"),
@@ -1843,7 +1939,7 @@ app.layout = dbc.Modal(
          #   justify="between",
         ),
         
-        dbc.Tooltip(logo_tooltip  ,target = 'logo-img',autohide = False,style = {'background-color':'#FFFFFF'},placement = 'right')
+            dbc.Tooltip(logo_tooltip  ,target = 'logo-img',autohide = False,style = {'background-color':'#FFFFFF'},placement = 'right')
         
            ]),
                 dbc.ModalBody(main_panel),
@@ -3110,16 +3206,18 @@ def update_images(ints,kd,ff,dkkd):
         time.sleep(1)
     
     
-        return ['', '']
+        return [dash.no_update,dash.no_update]
         
     elif os.path.isfile('/tmp/model.txt'):
         #print (os.path.isfile('/tmp/model.txt'))
+        
+        #print (datadir())
     
         jpgs = glob.glob(datadir()+'/model/*.jpg')
         
         ###########print (jpgs)
         
-        if len(jpgs)>1:
+        if len(jpgs)>1 and os.path.isfile('/tmp/running'):
             
             img1 = cv2.imread(datadir()+'/model/new_SAEHD_preview_SAEHD.jpg')
             img2 = cv2.imread(datadir()+'/model/new_SAEHD_preview_SAEHD masked.jpg')
@@ -3142,21 +3240,39 @@ def update_images(ints,kd,ff,dkkd):
             img3 = base64.b64encode(img3)
             src3 = 'data:image/jpg;base64,{}'.format(img3.decode())
             
-            img4 = cv2.resize(255 - img1[:100], (1280,350))
-            ret, img4 = cv2.imencode('.jpg', img4)
+            #img4 = cv2.resize(255 - img1[:100], (1280,350))
+            #ret, img4 = cv2.imencode('.jpg', img4)
             
             #p = cv2.imread(datadir()+'/model/new_SAEHD_preview_SAEHD masked.jpg')
             #p1 = cv2.imread(datadir()+'/model/new_SAEHD_preview_SAEHD.jpg')
-            img4 = base64.b64encode(img4)
-            src4 = 'data:image/jpg;base64,{}'.format(img4.decode())
+            #img4 = base64.b64encode(img4)
+            #src4 = 'data:image/jpg;base64,{}'.format(img4.decode())
+            #print (datadir()+'/model/loss_history.npy')
+            if os.path.isfile(datadir()+'/model/loss_history.npy') :
+                
+                graph_ = update_graph_loss(
+                            "accuracy-graph",
+                            "Prediction Accuracy",
+                            "train accuracy",
+                            "val accuracy",
+                            True,
+                            'overlap',
+                            ['train','val'],
+                            .99,
+                            "Accuracy",
+                        ),
+                #print ('eaaa')
+            else:
+                #print ('nnnn')
+                graph_ = dash.no_update
             del st
-            return  [html.Img(id = 'Mask', src = src3, style = {'width' : '100%', 'height' : '100%'}), 
-            html.Img(id = 'Mask_1', src = src4, style = {'width' : '100%', 'height' : '100%'})]
+            return  [html.Img(id = 'Mask', src = src3, style = {'width' : '100%', 'height' : '100%'}), graph_]
+            #html.Img(id = 'Mask_1s', src = src4, style = {'width' : '100%', 'height' : '100%'})]
             
         
         else:
         
-            return ['', '']
+            return [dash.no_update,dash.no_update]
     else:
         return dash.no_update,dash.no_update
     
@@ -3270,7 +3386,8 @@ def display_page(n):
           Output('choose_face_modal',"children"),
           Output('error_modal', 'is_open'),
           Output('Progress_modal_tqdm', 'value'),
-          Output('Progress_modal_tqdm', 'style')
+          Output('Progress_modal_tqdm', 'style'),
+     
                 ],
               
     [Input('start_text_continue_', 'children'),Input('interval-1', 'n_intervals'), Input('confirm_delete', 'children'),Input('temp_delete', 'children'), Input('Resetal-addclick', 'n_clicks'),
@@ -3537,7 +3654,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
         #    threadon_ = True
         #    no_loop = False
         #    Progress_header = 'Choose an option'
-        #    status_children = 'Start the Process'
+        #    status_children = 'Dashboard'
             
       
       
@@ -3548,7 +3665,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       
   else:
   
-      #status_children = 'Start the Process'
+      #status_children = 'Dashboard'
       
       #Progress_header = 'Choose an option'
       
@@ -3556,7 +3673,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
       start_text_continue_disabled = False
       start_text_input_disabled = False
       face_type_select_disabled = False
-      status_children = 'Start the Process'
+      status_children = html.H1('Dashboard')
       
       
       
@@ -3565,7 +3682,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
     
   
     #Progress_header = 'Choose an option'
-    #status_children = 'Start the Process'
+    #status_children = 'Dashboard'
     
   #is_modal_open = False
   
@@ -3654,7 +3771,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
   
         cols = dash.no_update
         
-        
+ 
         
   if os.path.isfile('/tmp/running'):
   
@@ -3668,10 +3785,12 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
     
     except:
         convert_id = ''
-    title_project = html.Div([dbc.Badge([ dbc.Spinner(size="lg", color = 'danger'), ' Training: ', dbc.Badge(convert_id,color = 'primary', id = 'status_msg')], color="light", className="ml-1")])
+    title_project = html.H1('Dashboard')#dbc.Row([ dbc.Col(html.H1('Dashboard'), width = 2.5), dbc.Col(dbc.Badge(convert_id, color = 'primary', id = 'status_msg'))])
                     
   
     status_children = title_project
+    
+
     try:
     
       header = watch.get_interval()
@@ -3707,7 +3826,7 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
    # Progress_header = ' Stopped'
   else:
       Progress_header = 'Choose an option'
-      status_children = 'Start the Process'
+      status_children = html.H1('Dashboard')
         
         
   if trigger_id == 'Resetal-addclick.n_clicks' or trigger_id == 'delete-addclick.n_clicks' or trigger_id == 'convert_start.n_clicks':
@@ -3723,7 +3842,8 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
     display_1 = {"display":"none"}
         
     
-  return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1, is_modal_open,progress_msg, Progress_modal,cols,error_modal, Progress_modal_tqdm_value, Progress_modal_tqdm_style]
+  return [  status_children, Progress_header , start_text_continue_disabled, start_text_input_disabled, face_type_select_disabled,  modal_error_details, modal_error_is_open, interval_interval, display_, display_1,
+  is_modal_open,progress_msg, Progress_modal,cols,error_modal, Progress_modal_tqdm_value, Progress_modal_tqdm_style ]
     
 @app.callback([Output('src_face_img', 'src'),Output('src_frames_nos', 'children'), Output('add_src_face', 'disabled'), Output('src_slider', 'max'), Output('src_slider', 'marks')],
             [Input('select_src_face', 'value'), Input('add_src_face', 'n_clicks'), Input('src_slider', 'value')])
