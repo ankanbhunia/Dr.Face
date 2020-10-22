@@ -1204,8 +1204,9 @@ dbc.FormGroup(
 ])
 Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "7px", 'display':'none'},),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
-Progress =  html.Div([html.Div([dbc.Button(' New',outline=False, id = 'New_workspace',  active=False, disabled = False, color="light", className="fas fa-plus",),
-dbc.Button(' Open',outline=False, id = 'Open_workspace', active=False, disabled = False,color="light", className="fas fa-redo")], id = 'start_buttons', style = {'text-align' : 'center', 'color':'blue'})
+Progress =  html.Div([html.Div([dbc.Button(html.Div([html.Img(src = '/assets/new.svg', style = {'height':'16px'}), ' New ']),outline=False, id = 'New_workspace',  active=False, disabled = False, color="light",),
+dbc.Button(html.Div([html.Img(src = '/assets/open.svg',style = {'height':'16px'}), ' Open']),outline=False, id = 'Open_workspace', active=False, disabled = False,color="light"),
+dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}), ' Help']),outline=False, id = 'Help_workspace', active=False, disabled = False,color="light")], id = 'start_buttons', style = {'text-align' : 'center', 'color':'blue'})
 ,dbc.Modal(
             [
                 dbc.ModalHeader("Create a New Workspace"),
@@ -2333,51 +2334,53 @@ def update(n1,n2,select_mode,select_resolution, select_device_, select_device, s
             
             return dash.no_update, dash.no_update,  dash.no_update, True
     elif trigger_id == 'Open_modal_Butt.n_clicks':
-    
-        model = [i['label'] for i in option_ if i['value'] == int(start_text_input_)][0]
-        #print (model)
-        f = open('/tmp/model.txt','w+')
-        
-        convert_id = f.write(model)
-        f.close()
-        
-        if os.path.isfile(datadir()+"/data_dst.mp4") and os.path.isfile(datadir()+"/data_src.mp4"):
-    
-            if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
-            if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
-            if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
-            if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
-            if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
-            for filename in glob.glob("assets/*.mp4"):os.remove(filename)
-            if not os.path.isdir('assets'): os.mkdir('assets')
+        try:
+            model = [i['label'] for i in option_ if i['value'] == int(start_text_input_)][0]
+            #print (model)
+            f = open('/tmp/model.txt','w+')
             
-            
-            if type(select_device_) == list: select_device_ = ','.join([str(i) for i in select_device_])
-            f = open(datadir()+'/.params', 'r')
-            params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
-            params['Batchsize'] = select_Batchsize_
-            params['device'] = select_device_
-            #print ('asknksafnklkl')
-            ##print (params['device'])
-            #print ('asknksafnklkl')
+            convert_id = f.write(model)
             f.close()
-            #print ('asknksafnklkl')
-            f = open(datadir()+'/.params', 'w+')
-            f.write('facetype '+str(params['facetype'])+'\n')
-            f.write('Quality '+str(params['Quality'])+'\n')
-            f.write('device '+str(params['device'])+'\n')
-            f.write('Batchsize '+str(params['Batchsize'])+'\n')
-            f.write('suggest_batch_size '+str(params['suggest_batch_size'])+'\n')
-            f.close()
-            #print ('trigerr')
-            #print (start_text_input_)
-            counter_children = counter_children + 1
-            #print (counter_children)
-            open('/tmp/start','w+').close()
-            return start_text_input_, dash.no_update, counter_children, error_modal_no_data
             
-        else:
+            if os.path.isfile(datadir()+"/data_dst.mp4") and os.path.isfile(datadir()+"/data_src.mp4"):
+        
+                if not os.path.isdir(datadir()+''): os.mkdir(datadir()+'')
+                if not os.path.isdir(datadir()+'/data_dst'): os.mkdir(datadir()+'/data_dst')
+                if not os.path.isdir(datadir()+'/data_src'): os.mkdir(datadir()+'/data_src')
+                if not os.path.isdir(datadir()+'/model'): os.mkdir(datadir()+'/model')
+                if not os.path.isdir(datadir()+'/preview'): os.mkdir(datadir()+'/preview')
+                for filename in glob.glob("assets/*.mp4"):os.remove(filename)
+                if not os.path.isdir('assets'): os.mkdir('assets')
                 
+                
+                if type(select_device_) == list: select_device_ = ','.join([str(i) for i in select_device_])
+                f = open(datadir()+'/.params', 'r')
+                params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+                params['Batchsize'] = select_Batchsize_
+                params['device'] = select_device_
+                #print ('asknksafnklkl')
+                ##print (params['device'])
+                #print ('asknksafnklkl')
+                f.close()
+                #print ('asknksafnklkl')
+                f = open(datadir()+'/.params', 'w+')
+                f.write('facetype '+str(params['facetype'])+'\n')
+                f.write('Quality '+str(params['Quality'])+'\n')
+                f.write('device '+str(params['device'])+'\n')
+                f.write('Batchsize '+str(params['Batchsize'])+'\n')
+                f.write('suggest_batch_size '+str(params['suggest_batch_size'])+'\n')
+                f.close()
+                #print ('trigerr')
+                #print (start_text_input_)
+                counter_children = counter_children + 1
+                #print (counter_children)
+                open('/tmp/start','w+').close()
+                return start_text_input_, dash.no_update, counter_children, error_modal_no_data
+                
+            else:
+                    
+                return dash.no_update, dash.no_update,  dash.no_update, True
+        except:
             return dash.no_update, dash.no_update,  dash.no_update, True
     else:
             return  dash.no_update, dash.no_update, dash.no_update,error_modal_no_data
