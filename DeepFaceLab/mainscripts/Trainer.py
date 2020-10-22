@@ -168,7 +168,7 @@ def trainerThread (s2c, c2s, e,
                             
                             model_save()
 
-                        if model.get_iter()%10 == 0:
+                        if model.get_iter()%50 == 0:
 
                           np.save(datadir()+'/model/loss_history.npy',np.round(loss_history,2))
                           

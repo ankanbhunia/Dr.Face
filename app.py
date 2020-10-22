@@ -193,18 +193,22 @@ def update_graph_loss(
         number_of_points = len(data_stream)
 
         start_point = number_of_points//100
-        #print (start_point, number_of_points)
         sparse_idx = np.arange(0,number_of_points-start_point,number_of_points//5000 + 1)
         step = np.arange(start_point,number_of_points)[sparse_idx]
-        
-        y_train = data_stream[start_point:number_of_points,0][sparse_idx]
-        y_val =data_stream[start_point:number_of_points,1][sparse_idx]
 
-        if "train" in checklist_smoothing_options:
-            y_train = smooth(y_train, weight=.4)
+        y_tr = data_stream[start_point:number_of_points,0]
+        y_tr = np.array([0]*(y_tr.shape[0]%(number_of_points//5000 + 1)) + list(y_tr)) 
+        y_train = np.mean(np.reshape(y_tr, [-1, number_of_points//5000 + 1]), 1)
 
-        if "val" in checklist_smoothing_options:
-            y_val = smooth(y_val, weight=.4)
+        y_va = data_stream[start_point:number_of_points,1]
+        y_va = np.array([0]*(y_va.shape[0]%(number_of_points//5000 + 1)) + list(y_va)) 
+        y_val = np.mean(np.reshape(y_va, [-1, number_of_points//5000 + 1]), 1)
+
+        #if "train" in checklist_smoothing_options:
+        #    y_train = smooth(y_train, weight=.4)
+
+        #if "val" in checklist_smoothing_options:
+        #    y_val = smooth(y_val, weight=.4)
 
         trace_train_ = go.Scatter(
             x=step,
@@ -1618,10 +1622,7 @@ controls_start = dbc.Jumbotron(
     [
         html.Div(html.H1("Dashboard"),id  = 'status'),
 
-        dbc.Tooltip( id = 'status_tooltip',
-            target="status",
-            placement = 'right'
-        ),
+       
         html.Br(),
         dbc.ButtonGroup(
             [dbc.Button(outline=True, id = 'Start-click', active=True, disabled = False, color="success", className="fas fa-hourglass-start"),
@@ -3272,7 +3273,7 @@ def update_images(ints,kd,ff,dkkd):
         
         else:
         
-            return [dash.no_update,dash.no_update]
+            return ['','']
     else:
         return dash.no_update,dash.no_update
     
@@ -3314,39 +3315,7 @@ def open_toast1(n,dd,dlld, kll,loo):
     else:
     
         return False
-@app.callback(
-    [Output("status_tooltip", "children"),Output("status_tooltip", "style")],
-    [Input("interval-3", "n_intervals")]
-)
-def open_toast1(n):
-    if os.path.isfile('/tmp/running'):
-        f = open(datadir()+'/.params', 'r')
-        params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
-        f.close()
-        fd = {'0': 'Face & Head', '1':'Full face', '2': 'Half Face'}
-        Qd = {'1':"High",'2':"Medium",'3':"Low",'4':"Very Low"}
-        Rd = {'1':"640",'2':"256",'3':"128",'4':"64"}
-        IRd = {'1':"1080",'2':"512",'3':"480",'4':"256"}
-        Bd = {'1':'Auto','2':'2','4':'4','8':'8','16':'16'}
-        divs= params['device'].split(',') 
-        if 'C' in divs: divs.remove('C')
-        if len(divs) == 0: device_ = 'CPU'
-        else: 
-            device_ = ''
-            for i in divs: 
-                device_ = device_ + 'GPU:'+i + ' '
-        
-        return [html.Div('Path: '+datadir()),
-        html.Div('Mode: '+fd[params['facetype']]),
-        html.Div('Quality: '+Qd[params['Quality']]),
-        html.Div('Face size: '+Rd[params['Quality']]+'x'+Rd[params['Quality']]),
-        html.Div('Image size: '+IRd[params['Quality']]+'x'+IRd[params['Quality']]),
-        html.Div('Batchsize: '+Bd[params['Batchsize']]),
-        html.Div('Device: '+device_)], {'display':''}
-    else:
-        return '',{'display':'none'}
-    
-        
+
         
 @app.callback(Output("tempvar", "value"), [Input('Start-click', 'n_clicks')])
 def update_var(inf):
@@ -3785,9 +3754,41 @@ def update_start(n, intval,confirm_delete, aadss, fkdk,lsls, dddw,t1, model_name
     
     except:
         convert_id = ''
-    title_project = html.H1('Dashboard')#dbc.Row([ dbc.Col(html.H1('Dashboard'), width = 2.5), dbc.Col(dbc.Badge(convert_id, color = 'primary', id = 'status_msg'))])
-                    
+    #title_project = [html.H1('Dashboard'), dbc.Badge(convert_id, color = 'primary', id = 'status_msg'), 
+    #dbc.Badge('mask type', color = 'success', id = 'status_msg')]#dbc.Row([ dbc.Col(html.H1('Dashboard'), width = 2.5), dbc.Col(dbc.Badge(convert_id, color = 'primary', id = 'status_msg'))])
+    f = open(datadir()+'/.params', 'r')
+    params = {i[:-1].split(' ')[0]:i[:-1].split(' ')[1] for i in f.readlines()}
+    f.close()
+    fd = {'0': 'Face & Head', '1':'Full face', '2': 'Half Face'}
+    Qd = {'1':"High",'2':"Medium",'3':"Low",'4':"Very Low"}
+    Rd = {'1':"640",'2':"256",'3':"128",'4':"64"}
+    IRd = {'1':"1080",'2':"512",'3':"480",'4':"256"}
+    Bd = {'1':'Auto','2':'2','4':'4','8':'8','16':'16'}
+    divs= params['device'].split(',') 
+    if 'C' in divs: divs.remove('C')
+    if len(divs) == 0: device_ = 'CPU'
+    else: 
+        device_ = ''
+        for i in divs: 
+            device_ = device_ + 'GPU:'+i + ' '
   
+
+        
+    title_project = [   html.H1([dbc.Spinner(color="primary", type="grow", spinner_style = {'margin-bottom':'8px'}),' Dashboard'], className = "mr-1"),
+        dbc.Badge(convert_id,  color="danger", className="mr-1", id = 'a1'),
+        dbc.Badge(fd[params['facetype']], color="warning", className="mr-1", id = 'a2'),
+        dbc.Badge(Qd[params['Quality']],  color="primary", className="mr-1", id = 'a3'),
+        #dbc.Badge('Face size: '+Rd[params['Quality']]+'x'+Rd[params['Quality']],  color="primary", className="mr-1"),
+        #dbc.Badge('Image size: '+IRd[params['Quality']]+'x'+IRd[params['Quality']],  color="primary", className="mr-1"),
+        dbc.Badge(Bd[params['Batchsize']], color="info", className="mr-1", id = 'a4'),
+        dbc.Badge(device_, color="success", className="mr-1", id = 'a5'),
+        dbc.Tooltip('Workspace Name', target ='a1'),
+        dbc.Tooltip('Mode of swapping', target ='a2'),
+        dbc.Tooltip('Resolution | '+'Face size: '+Rd[params['Quality']]+'x'+Rd[params['Quality']] +' | '+'Image size: '+IRd[params['Quality']]+'x'+IRd[params['Quality']], target ='a3'),
+        dbc.Tooltip('Batchsize', target ='a4'),
+        dbc.Tooltip('Device', target ='a5'),
+    ]
+
     status_children = title_project
     
 
