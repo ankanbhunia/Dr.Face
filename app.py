@@ -1819,7 +1819,7 @@ tabs = html.Div(
         dbc.Tabs(
             [
                 dbc.Tab(Upload_Tab, label="Upload", tab_id="tab-1"),
-                dbc.Tab(Training_Tab, label="Train/Resume", tab_id="tab-2"),
+                dbc.Tab(Training_Tab, label="Dashboard", tab_id="tab-2"),
                 # dbc.Tab(Convert_Tab, label="Convert", tab_id="tab-3"),
             ],
             id="tabs",

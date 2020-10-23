@@ -1,0 +1,116 @@
+import os
+from IPython.display import HTML, clear_output
+from IPython.display import Javascript
+from IPython.display import Image
+from google.colab.output import eval_js
+import argparse
+
+parser = argparse.ArgumentParser(description='Dr.Face Options')
+
+
+parser.add_argument('--token', type=str,
+                   help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
+
+                    
+parser.add_argument('--path', type=str,
+                    help='Specify drive path')
+                    
+                    
+parser.add_argument('--no_drive', action='store_true',
+                    help='don\'t mount drive')  
+
+parser.add_argument('--debug', action='store_true',
+                    help='the shell output will be shown')
+
+args = parser.parse_args()
+
+xxx = args.token
+drive_path = args.path
+notmount = args.no_drive
+debug = args.debug
+
+    
+import sys
+clear_output()
+
+ipy = get_ipython()
+ipy.magic("tensorflow_version 1.x")
+
+clear_output()
+
+  
+GPU = get_ipython().getoutput("nvidia-smi --query-gpu=name --format=csv,noheader")
+
+try:
+  gpu = GPU[0]
+except:
+  gpu = 'CPU'
+
+
+
+if not os.path.isfile('/tmp/done'):
+  if not notmount:
+    if not os.path.isdir('drive/'):
+      from google.colab import drive; drive.mount('drive', force_remount=True) 
+      
+      clear_output()
+      
+     
+
+  print ('['+gpu+']'+' Please wait for few minutes... ')
+  get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git foo; mv foo/* foo/.git* .; rmdir foo; gdown --id 1-7XxOStSUCRfjtgJqzO57Z2Ku2TpmBGa; tar -xvf drfacelib.tar.gz; rm drfacelib.tar.gz; touch /tmp/done')
+  get_ipython().system_raw('sudo apt-get install -y xattr')
+
+clear_output()
+
+
+print ("[GPU Device]="+gpu)
+
+
+print ("""
+
+""")
+
+if xxx:
+
+  try:
+
+    get_ipython().system_raw("pip3 install pyngrok")
+    get_ipython().system_raw("ngrok authtoken " + xxx)
+    from pyngrok import ngrok
+    ngrok.kill()
+    print("Project URL: "+ngrok.connect(port = '4000'))
+
+  except:
+
+    print ('The ngrok token is invalid')
+    print("Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
+
+else:
+
+  print("Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
+
+
+print("""
+                                                                                                                                                                                                 
+                                                                                                                                           
+  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______  ______ 
+ |______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______||______|
+                                                                                                                                                                         
+""")
+
+get_ipython().system_raw("fuser -k 4000/tcp")
+
+if drive_path:
+
+    if not debug:
+      get_ipython().system_raw("Library/bin/python app.py "+drive_path)
+    else:
+      G = get_ipython().getoutput("Library/bin/python app.py "+drive_path)
+      
+else:
+
+    if not debug:
+      get_ipython().system_raw("Library/bin/python app.py")
+    else:
+      G = get_ipython().getoutput("Library/bin/python app.py")
