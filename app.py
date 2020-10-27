@@ -34,7 +34,8 @@ import queue
 import random
 import string
 from multiprocessing import Process, Queue
-#global thread_list
+from dash.dependencies import Input, Output, State, MATCH, ALL
+
 thread_list = []
 import subprocess
 global subprocess_list
@@ -1202,6 +1203,30 @@ dbc.FormGroup(
     ]
 )
 ])
+
+data_imgs = glob.glob('/data/hhh/data_dst/aligned/*')[:10]
+n_rows = 3
+
+frm_src  = ['data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png',cv2.resize(cv2.imread(i), (64,64)))[1]).decode()) for i in data_imgs]
+
+lvc = []
+for i in range(len(frm_src)//n_rows):
+  lvc.append(dbc.Row([dbc.Col(html.Div([html.Img(src = j, style = {'width':'64px','border-radius':'4px'}, id = 'src_imgs_tooltip_div-'+str(n_rows*i + idx))
+  , dbc.Checkbox(checked = False, id={'type': 'check_box_src','index': str(n_rows*i + idx)},className="form-check-input")])) 
+  for idx,j in enumerate(frm_src[i*n_rows:n_rows*i+n_rows])], no_gutters=True,))
+
+lvc_ = []
+i = i+1
+remaining_srcs = frm_src[i*n_rows:n_rows*i+n_rows]
+print (i)
+lvc_.append(dbc.Row([dbc.Col(html.Div([html.Img(src = j, style = {'width':'64px','border-radius':'4px', 'border':'6px'}, id = 'src_imgs_tooltip_div-'+str(n_rows*i + idx))
+, dbc.Checkbox(checked = False, id={'type': 'check_box_src','index': str(n_rows*i + idx)}, className="form-check-input")])) 
+for idx,j in enumerate(remaining_srcs)], no_gutters=True,))
+
+
+lvc = html.Div([html.Div(lvc, style = {'width':str(64*n_rows)+'px'}),html.Div(lvc_, style = {'width':str(64*len(remaining_srcs))+'px'}),
+html.Div([dbc.Tooltip(html.Div(str(i)+' images', style  = {'height':'20px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
+
 Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "7px", 'display':'none'},),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
 Progress =  html.Div([html.Div([dbc.Button(html.Div([html.Img(src = '/assets/new.svg', style = {'height':'16px'}), ' New ']),outline=False, id = 'New_workspace',  active=False, disabled = False, color="light",),
@@ -1309,11 +1334,52 @@ dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}
                 
             ],
             id="error_modal",
+            centered=True,
             #centered=True,
             backdrop = 'static',
             #autoFocus = True
           
         ),
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        dbc.Modal(
+            [
+                dbc.ModalHeader("PICS"),
+                dbc.ModalBody( html.Div(lvc), style = {'text-align':'center'}),
+                
+                dbc.ModalFooter(
+                    [dbc.Button( outline = True, id = 'pics_okays', active=False,  color="primary",size = 'sm', className="fas fa-plus")]
+                ),
+                
+            ],
+            id="test_pic",
+            is_open = True,
+            backdrop = 'static',
+            scrollable=True,
+            style = {'maxWidth': '230px'}
+            
+            
+          
+        ),
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         html.Div(dbc.InputGroup(
@@ -1324,7 +1390,7 @@ dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}
             size="sm",
         ), style = {'display':'none'}),
         
-        html.Div([html.Div( id = 'preview_graph'), html.Br(),html.Div(id = 'preview_imgs'),dbc.Progress(id = 'preview_progress', style={"height": "6px"})], id= 'preview_divs', style = {'display':'none'})])
+        html.Div([html.Div( id = 'preview_graph'), html.Br(),html.Div(id = 'preview_imgs'),dbc.Progress(id = 'preview_progress', style={"height": "6px"}), dbc.Tooltip('Preview Loading...', target = 'preview_progress')], id= 'preview_divs', style = {'display':'none'})])
         
        
 #dbc.InputGroup(
@@ -2439,9 +2505,15 @@ dbc.FormGroup([
  
  '''
  
- 
- 
- 
+@app.callback(
+    Output({'type': 'check_box_src', 'index': MATCH}, 'style'),
+    [Input({'type': 'check_box_src', 'index': MATCH}, 'checked')]
+)
+def display_output(values):
+
+    return dash.no_update
+        
+    
  
  
         
