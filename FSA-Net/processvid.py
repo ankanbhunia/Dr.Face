@@ -2,8 +2,8 @@ import sys
 sys.path.append('/content/FSA-Net')
 import dlib
 import face_detection
-from facenet_pytorch import MTCNN
-from facenet_pytorch import InceptionResnetV1
+#from facenet_pytorch import MTCNN
+#from facenet_pytorch import InceptionResnetV1
 from lib.FSANET_model import *
 import numpy as np
 from keras.layers import Average
@@ -12,7 +12,7 @@ from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm.notebook import tqdm
-mtcnn = MTCNN(keep_all=True, device='cuda')
+#mtcnn = MTCNN(keep_all=True, device='cuda')
 from collections import defaultdict 
 from moviepy.editor import VideoFileClip, concatenate_videoclips
 from tqdm.notebook import tqdm
@@ -316,10 +316,10 @@ def parse_args():
 def EXTRACT_INFO(v_cap):
 
     DT = defaultdict(dict)
-    
+    DT_ = defaultdict(dict)
     tracker =  Sort()
     #v_cap = VideoFileClip(path)
-    v_cap = v_cap.resize(height=480)
+    v_cap = v_cap.resize(height=240)
     b_size = 5
 
     data = {}
@@ -349,16 +349,25 @@ def EXTRACT_INFO(v_cap):
             trackers = tracker.update(bbs)
 
             for b in trackers:
+            
+            
+              X1, X2, X3, X4 = b[0], b[1], b[2], b[3]
+              Size_W, Size_H = X3-X1, X4-X2
               
-              bbox_fr_ = np.array(fr.crop(b[:4]))
-              bbox_fr = cv2.resize(bbox_fr_, (64,64))
+              X1_ = X1 - Size_W*0.3
+              X2_ = X2 - Size_H*0.3
+              X3_ = X3 + Size_W*0.3
+              X4_ = X4 + Size_H*0.3
+              
+              bbox_fr = np.array(fr.crop(b[:4]))
+              bbox_fr= cv2.resize(bbox_fr, (64,64))
               bbox_fr = np.expand_dims(bbox_fr, axis=0)
               bbox_list.append(bbox_fr)
 
-              if len(DT[int(b[4])])== 0:
-                DT[int(b[4])]['IMG'] = []#bbox_fr_
+              if len(DT_[int(b[4])])== 0:
+                DT_[int(b[4])]['IMG'] = []#bbox_fr_
 
-              DT[int(b[4])]['IMG'].append( bbox_fr_)
+              DT_[int(b[4])]['IMG'].append(fr.crop([X1_, X2_, X3_, X4_]))
 
               feats_ = facerec.compute_face_descriptor(np.array(fr), sp(np.array(fr), dlib.rectangle(int(b[0]),int(b[1]),int(b[2]),int(b[3]))))
             
@@ -374,14 +383,107 @@ def EXTRACT_INFO(v_cap):
     labels = data['TRACK_ID']
     
 
-    for p in list(set(labels)):
+    for p in tqdm(list(set(labels)), total = len(set(labels))):
 
       indx_p = np.where([labels == np.ones_like(labels)*p])[-1]
       
-      if len(indx_p)>10:
-        DT[p]['BBOX'] = np.array(data['BBOX'])[indx_p]
-        DT[p]['Frame_ID'] = np.array(data['Frame_ID'])[indx_p]
-        DT[p]['BBOX_FEAT'] = np.array(data['BBOX_FEAT'])[indx_p]
-        DT[p]['ANGLE'] = np.array(data['ANGLE'] )[indx_p]
+    
+      DT[p]['BBOX'] = np.array(data['BBOX'])[indx_p]
+      DT[p]['Frame_ID'] = np.array(data['Frame_ID'])[indx_p]
+      DT[p]['BBOX_FEAT'] = np.array(data['BBOX_FEAT'])[indx_p]
+      DT[p]['ANGLE'] = np.array(data['ANGLE'] )[indx_p]
+
+
+      DT[p]['IMG'] = DT_[p]['IMG'] 
         
     return DT
+
+def EXCLUDE(DT, vcap, R = None, A = None, N = None):
+
+  DT_copy = DT.copy()
+
+  for p in DT.keys():
+    
+    
+      H, W = np.mean(DT[p]['BBOX'][:,2]  - DT[p]['BBOX'][:,0]), np.mean(DT[p]['BBOX'][:,3]  - DT[p]['BBOX'][:,1])
+      A_ = (H*W)/int(vcap.aspect_ratio*240*240)
+      N_ = len(DT[p]['BBOX'])
+
+      if R or A or N:
+
+        if R:
+
+          if H<R[0] and W<R[1]:
+
+            if p in DT_copy.keys():
+
+              DT_copy.pop(p)
+
+              continue
+            #print(p)
+
+        if A:
+          
+
+          if A>100*A_:
+
+            if p in DT_copy.keys():
+              DT_copy.pop(p)
+              continue
+
+        if N:
+
+          if N>N_:
+
+            if p in DT_copy.keys():
+              DT_copy.pop(p)
+              continue
+      
+        
+      DT_copy[p]['AVG_SIZE'] = H,W
+      DT_copy[p]['AREA'] = A_
+      DT_copy[p]['LEN'] = N_
+    
+
+  return DT_copy
+      
+
+
+
+
+
+def CLUSTER_TRACKS(DT, threshold):
+
+    track_feats = []
+
+    for i in DT.keys():
+
+      track_feats.append(dlib.vector(DT[i]['BBOX_FEAT'].mean(0)))
+      
+    CL = defaultdict(dict)
+
+    cluster_ids = dlib.chinese_whispers_clustering(track_feats, threshold)
+    
+    for i in cluster_ids:
+    
+      try:
+        CL[i]['BBOX']  = CL[i]['BBOX'] +  DT[list(DT.keys())[i]]['BBOX'] 
+        CL[i]['Frame_ID']  = CL[i]['Frame_ID'] +  DT[list(DT.keys())[i]]['Frame_ID'] 
+        CL[i]['BBOX_FEAT']  = CL[i]['BBOX_FEAT'] +  DT[list(DT.keys())[i]]['BBOX_FEAT'] 
+        CL[i]['ANGLE']  = CL[i]['ANGLE'] +  DT[list(DT.keys())[i]]['ANGLE'] 
+        CL[i]['IMG']  = CL[i]['IMG'] +  DT[list(DT.keys())[i]]['IMG'] 
+        CL[i]['AVG_SIZE'] = DT[list(DT.keys())[i]]['AVG_SIZE'] 
+        CL[i]['AREA'] = DT[list(DT.keys())[i]]['AREA'] 
+        CL[i]['LEN'] = DT[list(DT.keys())[i]]['LEN']  + DT[list(DT.keys())[i]]['LEN'] 
+
+      except:
+        CL[i]['BBOX']  =  DT[list(DT.keys())[i]]['BBOX']  
+        CL[i]['Frame_ID']  =  DT[list(DT.keys())[i]]['Frame_ID']  
+        CL[i]['BBOX_FEAT']  =  DT[list(DT.keys())[i]]['BBOX_FEAT']  
+        CL[i]['ANGLE']  =  DT[list(DT.keys())[i]]['ANGLE']   
+        CL[i]['IMG']  =  DT[list(DT.keys())[i]]['IMG']     
+        CL[i]['AVG_SIZE'] = DT[list(DT.keys())[i]]['AVG_SIZE'] 
+        CL[i]['AREA'] = DT[list(DT.keys())[i]]['AREA'] 
+        CL[i]['LEN'] = DT[list(DT.keys())[i]]['LEN'] 
+        
+    return CL
