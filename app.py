@@ -83,6 +83,7 @@ global dst_face_list
 dst_face_list = []
 import sys
 sys.path.append('dash-player')
+sys.path.append('FSA-Net')
 global convert_disabled
 convert_disabled = False
 import dash_player
@@ -99,6 +100,10 @@ if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
 if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')
 if os.path.isfile('/tmp/shutdown'): os.remove('/tmp/shutdown')
 if os.path.isfile('/tmp/downloaddrive'): os.remove('/tmp/downloaddrive')
+if os.path.isfile('/tmp/InfoComplete'): os.remove('/tmp/InfoComplete')
+if os.path.isfile('/tmp/videoprocessing'): os.remove('/tmp/videoprocessing')
+if os.path.isfile('videos/Source/INFO.npy'): os.remove('videos/Source/INFO.npy')
+if os.path.isfile('videos/Target/INFO.npy'): os.remove('videos/Target/INFO.npy')
 
 if os.path.isdir('/tmp/cluster'): shutil.rmtree('/tmp/cluster')
 
@@ -945,6 +950,33 @@ def Main(q, option_id):
             return False        
             
             
+def get_info_from_src_frames(VID):
+
+    
+    
+    import processvid as pv
+    VID_INFO = pv.EXTRACT_INFO(VID)   
+    
+    if os.path.isfile('videos/Source/INFO.npy'):
+        
+        NPFILE = np.load('videos/Source/INFO.npy', allow_pickle = True).item()
+        
+        NPFILE['DATA'].append(VID_INFO)
+        
+        np.save('videos/Source/INFO.npy', NPFILE)
+    else:
+    
+        NPFILE = {}
+        NPFILE['DATA'] = []
+        NPFILE['DATA'].append(VID_INFO)
+        
+        np.save('videos/Source/INFO.npy', NPFILE)
+     
+    open('/tmp/InfoComplete','w+').close()
+     
+    
+    #if os.path.isfile('/tmp/videoprocessing'): os.remove('/tmp/videoprocessing')
+
         
           
             
@@ -1012,7 +1044,7 @@ if not os.path.isdir('videos/Target/Youtube'): os.mkdir('videos/Target/Youtube')
 if not os.path.isdir('videos/Target/Upload'): os.mkdir('videos/Target/Upload')
 if not os.path.isdir('videos/Target/Record'): os.mkdir('videos/Target/Record')
 if not os.path.isdir('videos/Target/Final'): os.mkdir('videos/Target/Final')
-  
+
 record = [html.Div(children = [html.Img(src="/video_feed", style={
             'width': '266px',
             'height': '200px'
@@ -1204,6 +1236,13 @@ dbc.FormGroup(
 )
 ])
 
+
+
+#############################################################################3
+
+
+
+i = 0
 data_imgs = glob.glob('/data/hhh/data_dst/aligned/*')[:10]
 n_rows = 3
 
@@ -1225,7 +1264,16 @@ for idx,j in enumerate(remaining_srcs)], no_gutters=True,))
 
 
 lvc = html.Div([html.Div(lvc, style = {'width':str(64*n_rows)+'px'}),html.Div(lvc_, style = {'width':str(64*len(remaining_srcs))+'px'}),
-html.Div([dbc.Tooltip(html.Div(str(i)+' images', style  = {'height':'20px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
+html.Div([dbc.Tooltip(html.Div(str(i)+' images', style  = {'font-size':'8px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
+
+
+
+
+
+#############################################################################
+
+
+
 
 Progress_modal = html.Div([html.Div(id = 'progress_msg'), html.Br(), dbc.Progress(id="Progress_modal_tqdm", color = 'success', style={"height": "7px", 'display':'none'},),dbc.Progress(value=0, id="Progress_modal", style={"height": "10px"}, striped=True, animated = True)])
 option_ = [{"label": '(1) New Workspace', "value" : 1}]+option_
@@ -1351,26 +1399,44 @@ dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}
         
         dbc.Modal(
             [
-                dbc.ModalHeader("PICS"),
-                dbc.ModalBody( html.Div(lvc), style = {'text-align':'center'}),
+                dbc.ModalHeader("Select Face of Interest"),
+                dbc.ModalBody( html.Div(id = 'choose_face_tracks'), style = {'text-align':'center'}),
                 
                 dbc.ModalFooter(
                     [dbc.Button( outline = True, id = 'pics_okays', active=False,  color="primary",size = 'sm', className="fas fa-plus")]
                 ),
                 
             ],
-            id="test_pic",
-            is_open = True,
+            id="choose_face_tracks_modal",
+            is_open = False,
             backdrop = 'static',
+            centered=True,
             scrollable=True,
-            style = {'maxWidth': '230px'}
+            style = {'maxWidth': '420px'}
             
             
           
         ),
         
         
-        
+        dbc.Modal(    
+            [   
+                dbc.ModalHeader('Processing video frames', id = 'process_video_progress_title'),
+                dbc.ModalBody([
+                               
+                                dbc.Progress(id = 'process_video_progress_bar')]),
+                
+          
+                
+            ],
+            id="process_video_progress",
+            is_open = False,
+            centered=True,
+            backdrop = 'static',
+            autoFocus = True,
+            style = {'maxWidth': '400px'}
+          
+        ),
         
         
         
@@ -2021,6 +2087,101 @@ app.layout = dbc.Modal(
             scrollable=True,
           
         )
+        
+        
+        
+         
+@app.callback([Output('process_video_progress','is_open'),Output('process_video_progress_bar','value'), Output('process_video_progress_title','children')],
+ [Input('crop_button_utube', 'n_clicks'), Input('interval-4', 'n_intervals')])    
+ 
+def update(n, intv):
+    trigger_id = dash.callback_context.triggered[0]['prop_id']
+    #print (trigger_id)
+    Progress_modal_tqdm_value = 0
+    Progress_modal_tqdm_title = ''
+    
+    try:
+
+        f = open('/tmp/ProgressN','r')
+
+        NN = int(f.read())
+        f.close()
+        f = open('/tmp/ProgressI','r')
+        II = int(f.read())
+        #print (II)
+
+        f.close()
+
+        Progress_modal_tqdm_value = int(II*100/NN)
+        Progress_modal_tqdm_title = '['+str(II)+ '/' +str(NN)+']'
+
+    except:
+        
+        Progress_modal_tqdm_titles = dash.no_update
+    
+    if n and trigger_id == 'crop_button_utube.n_clicks':
+        return True, Progress_modal_tqdm_value, Progress_modal_tqdm_title + ' Processing video frames'
+            
+    else:
+        return os.path.isfile('/tmp/videoprocessing'), Progress_modal_tqdm_value, Progress_modal_tqdm_title + ' Processing video frames'
+    
+        
+        
+@app.callback([Output('choose_face_tracks_modal','is_open'), Output('choose_face_tracks','children')],
+ [Input('interval-4', 'n_intervals')]) 
+ 
+def update(intv):
+    
+    if os.path.isfile('/tmp/InfoComplete'):
+        os.remove('/tmp/InfoComplete')
+        
+        
+        
+        DATA_info = np.load('/content/videos/Source/INFO.npy', allow_pickle = True).item()['DATA'][-1]
+        img_size = 84
+        
+        i = 0
+        data_imgs = [cv2.cvtColor(np.array(DATA_info[i]['IMG'][0]), cv2.COLOR_BGR2RGB) for i in DATA_info.keys()]#glob.glob('/data/hhh/data_dst/aligned/*')[:10]
+        n_data_imgs = [len(DATA_info[i]['IMG']) for i in DATA_info.keys()]
+        print (len(data_imgs))
+        n_rows = 3
+
+        frm_src  = ['data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png',cv2.resize(i, (img_size,img_size)))[1]).decode()) for i in data_imgs]
+
+        lvc = []
+        for i in range(len(frm_src)//n_rows):
+          lvc.append(dbc.Row([dbc.Col(html.Div([html.Img(src = j, style = {'border-radius':'4px'}, id = 'src_imgs_tooltip_div-'+str(n_rows*i + idx))
+          , dbc.Checkbox(checked = False, id={'type': 'check_box_src','index': str(n_rows*i + idx)},className="form-check-input")])) 
+          for idx,j in enumerate(frm_src[i*n_rows:n_rows*i+n_rows])], no_gutters=True,))
+
+        lvc_ = []
+        if len(data_imgs)<n_rows:
+            i = 0
+        else:
+            i = i+1
+        remaining_srcs = frm_src[i*n_rows:n_rows*i+n_rows]
+        print (i)
+        lvc_.append(dbc.Row([dbc.Col(html.Div([html.Img(src = j, style = {'border-radius':'4px', 'border':'6px'}, id = 'src_imgs_tooltip_div-'+str(n_rows*i + idx))
+        , dbc.Checkbox(checked = False, id={'type': 'check_box_src','index': str(n_rows*i + idx)}, className="form-check-input")])) 
+        for idx,j in enumerate(remaining_srcs)], no_gutters=True,))
+
+
+        lvc = html.Div([html.Div(lvc, style = {'width':str(img_size*n_rows)+'px'}),html.Div(lvc_, style = {'width':str(img_size*len(remaining_srcs))+'px'}),
+        html.Div([dbc.Tooltip(html.Div(str(n_data_imgs[i])+' images', style  = {'font-size':'12px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
+
+
+
+        if os.path.isfile('/tmp/videoprocessing'): os.remove('/tmp/videoprocessing')
+        
+        return True, lvc
+        
+    elif os.path.isfile('/tmp/InfoExit'):
+    
+        return False, ''
+        
+    else:
+    
+        return dash.no_update, dash.no_update
 @app.callback(Output('main_panel','style'), [Input('power_id', 'n_clicks')])    
 def update(n):
     if n:
@@ -2646,6 +2807,7 @@ def update_youtube(n, url):
                 value=[1, 999], marks = {0: '0:00', 1000: get_sec2time(VID.duration)}), 
                 html.Div(dbc.Button(['+', dbc.Badge(str(int((VID.duration))), id = 'n_utube', color="primary", className="ml-1")],id='crop_button_utube', 
 color="light", size="sm",  style = {'margin-top': '-20px','font-weight': 'bold'}), style = {'text-align':'center'})])
+
 @app.callback(
     [
       
@@ -2724,6 +2886,8 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     return [ False, str(video_index()), str(duration()) + 's', dash.no_update]
   else:
     return [s2, s3, s4, dash.no_update]
+    
+
 @app.callback(
     [Output('playback_utube', 'src'),
       #Output("Youtube-addclick", "n_clicks"), 
@@ -2733,7 +2897,9 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
     [Input('my-range-slider_utube', 'value'), 
       Input('crop_button_utube', 'n_clicks') 
       ],[State('playback_utube', 'src')])
+      
 def upload_playback_utube(rang, n_clicks, s):
+
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
     ###print'######################################################')
@@ -2753,6 +2919,8 @@ def upload_playback_utube(rang, n_clicks, s):
     trgger_value = dash.callback_context.triggered[0]['value']
   
     if trigger_id == 'crop_button_utube.n_clicks':
+    
+        open('/tmp/videoprocessing','w+').close()
         
         
     
@@ -2768,7 +2936,13 @@ def upload_playback_utube(rang, n_clicks, s):
         VID = VID.subclip(str_time, end_time)
         #del src_vids[-1]
         src_vids_clip.append(VID)
-      
+        
+        thr = Process(target = get_info_from_src_frames, args= (VID,))
+         
+        thr.start()
+        #global thread_list
+        thread_list.append(thr)
+        
         
         #cap.release()
         output = 'You have added total ' + str(video_index()) + ' video(s). You can add more videos.' 

@@ -11,11 +11,10 @@ import cv2
 from PIL import Image
 import numpy as np
 from matplotlib import pyplot as plt
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 #mtcnn = MTCNN(keep_all=True, device='cuda')
 from collections import defaultdict 
 from moviepy.editor import VideoFileClip, concatenate_videoclips
-from tqdm.notebook import tqdm
 import imutils
 predictor_path = '/content/FaceClust/shape_predictor_5_face_landmarks.dat' # Download from http://dlib.net/files/dlib_face_recognition_resnet_model_v1.dat.bz2
 face_rec_model_path = '/content/FaceClust/dlib_face_recognition_resnet_model_v1.dat' # Download from http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2
@@ -320,17 +319,26 @@ def EXTRACT_INFO(v_cap):
     tracker =  Sort()
     #v_cap = VideoFileClip(path)
     v_cap = v_cap.resize(height=240)
-    b_size = 5
+    b_size = 12
 
     data = {}
     data['BBOX'] =[]
     data['Frame_ID'] =[]
     data['ANGLE'] =[]
     data['TRACK_ID'] =[]
-    data['BBOX_FEAT'] = []
+    #data['BBOX_FEAT'] = []
     frames = []
     store_tmp_idx = []
-    for idx, frame in tqdm(enumerate(v_cap.iter_frames()), total = v_cap.reader.nframes):
+    n_fram = len(list(v_cap.iter_frames()))#v_cap.reader.nframes
+    ff = open('/tmp/ProgressN','w+')
+    ff.write(str(n_fram))
+    ff.close()
+
+    for idx, frame in tqdm(enumerate(v_cap.iter_frames()), total = n_fram):
+
+      ff = open('/tmp/ProgressI','w+')
+      ff.write(str(idx))
+      ff.close()
 
       frames.append(Image.fromarray(frame))
       store_tmp_idx.append(idx)
@@ -369,12 +377,12 @@ def EXTRACT_INFO(v_cap):
 
               DT_[int(b[4])]['IMG'].append(fr.crop([X1_, X2_, X3_, X4_]))
 
-              feats_ = facerec.compute_face_descriptor(np.array(fr), sp(np.array(fr), dlib.rectangle(int(b[0]),int(b[1]),int(b[2]),int(b[3]))))
+              #feats_ = facerec.compute_face_descriptor(np.array(fr), sp(np.array(fr), dlib.rectangle(int(b[0]),int(b[1]),int(b[2]),int(b[3]))))
             
               data['BBOX'].append(b[:4])
               data['Frame_ID'].append(fridx)
               data['TRACK_ID'].append(int(b[4]))
-              data['BBOX_FEAT'].append(feats_)
+              #data['BBOX_FEAT'].append(feats_)
             
         if len(bbox_list)>0: data['ANGLE'].extend(model.predict(np.concatenate(bbox_list, 0)))
         frames = []
@@ -382,7 +390,7 @@ def EXTRACT_INFO(v_cap):
 
     labels = data['TRACK_ID']
     
-
+    
     for p in tqdm(list(set(labels)), total = len(set(labels))):
 
       indx_p = np.where([labels == np.ones_like(labels)*p])[-1]
@@ -390,12 +398,15 @@ def EXTRACT_INFO(v_cap):
     
       DT[p]['BBOX'] = np.array(data['BBOX'])[indx_p]
       DT[p]['Frame_ID'] = np.array(data['Frame_ID'])[indx_p]
-      DT[p]['BBOX_FEAT'] = np.array(data['BBOX_FEAT'])[indx_p]
+      #DT[p]['BBOX_FEAT'] = np.array([data['BBOX_FEAT'][i] for i in indx_p])
       DT[p]['ANGLE'] = np.array(data['ANGLE'] )[indx_p]
 
 
       DT[p]['IMG'] = DT_[p]['IMG'] 
-        
+
+    if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
+    if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')    
+
     return DT
 
 def EXCLUDE(DT, vcap, R = None, A = None, N = None):
