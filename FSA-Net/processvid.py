@@ -329,7 +329,7 @@ def EXTRACT_INFO(v_cap):
     #data['BBOX_FEAT'] = []
     frames = []
     store_tmp_idx = []
-    n_fram = len(list(v_cap.iter_frames()))#v_cap.reader.nframes
+    n_fram = round(v_cap.fps * v_cap.duration)#v_cap.reader.nframes
     ff = open('/tmp/ProgressN','w+')
     ff.write(str(n_fram))
     ff.close()
@@ -403,6 +403,7 @@ def EXTRACT_INFO(v_cap):
 
 
       DT[p]['IMG'] = DT_[p]['IMG'] 
+      DT[p]['AR'] = v_cap.aspect_ratio
 
     if os.path.isfile('/tmp/ProgressN'): os.remove('/tmp/ProgressN')
     if os.path.isfile('/tmp/ProgressI'): os.remove('/tmp/ProgressI')    

@@ -1073,7 +1073,57 @@ def get_timeago(dirname):
     date = datetime.datetime.now()
     #print (date)
     return  (timeago.format(date, now)) # will #print 3 minutes ago
+
+def EXCLUDE(DT,  R = None, A = None, N = None):
+
+  DT_copy = DT.copy()
+
+  for p in DT.keys():
+    
+    
+      H, W = np.mean(DT[p]['BBOX'][:,2]  - DT[p]['BBOX'][:,0]), np.mean(DT[p]['BBOX'][:,3]  - DT[p]['BBOX'][:,1])
+      A_ = (H*W)/int(DT[p]['AR']*240*240)
+      N_ = len(DT[p]['BBOX'])
+
+      if R or A or N:
+
+        if R:
+
+          if H<R[0] and W<R[1]:
+
+            if p in DT_copy.keys():
+
+              DT_copy.pop(p)
+
+              continue
+            #print(p)
+
+        if A:
+          
+
+          if A>100*A_:
+
+            if p in DT_copy.keys():
+              DT_copy.pop(p)
+              continue
+
+        if N:
+
+          if N>N_:
+
+            if p in DT_copy.keys():
+              DT_copy.pop(p)
+              continue
       
+        
+      DT_copy[p]['AVG_SIZE'] = H,W
+      DT_copy[p]['AREA'] = A_
+      DT_copy[p]['LEN'] = N_
+    
+
+  return DT_copy
+      
+
 import glob
 import os
 search_dir = "/data/"
@@ -1399,7 +1449,7 @@ dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}
         
         dbc.Modal(
             [
-                dbc.ModalHeader("Select Face of Interest"),
+                dbc.ModalHeader("Select Faces of Interest"),
                 dbc.ModalBody( html.Div(id = 'choose_face_tracks'), style = {'text-align':'center'}),
                 
                 dbc.ModalFooter(
@@ -1412,7 +1462,7 @@ dbc.Button(html.Div([html.Img(src = '/assets/help.svg',style = {'height':'16px'}
             backdrop = 'static',
             centered=True,
             scrollable=True,
-            style = {'maxWidth': '420px'}
+            style = {'maxWidth': '290px'}
             
             
           
@@ -2097,7 +2147,7 @@ app.layout = dbc.Modal(
 def update(n, intv):
     trigger_id = dash.callback_context.triggered[0]['prop_id']
     #print (trigger_id)
-    Progress_modal_tqdm_value = 0
+    Progress_modal_tqdm_value = dash.no_update
     Progress_modal_tqdm_title = ''
     
     try:
@@ -2118,8 +2168,9 @@ def update(n, intv):
     except:
         
         Progress_modal_tqdm_titles = dash.no_update
-    
+    if os.path.isfile('/tmp/InfoComplete'): Progress_modal_tqdm_value = 100
     if n and trigger_id == 'crop_button_utube.n_clicks':
+        Progress_modal_tqdm_value = 0
         return True, Progress_modal_tqdm_value, Progress_modal_tqdm_title + ' Processing video frames'
             
     else:
@@ -2136,17 +2187,20 @@ def update(intv):
         os.remove('/tmp/InfoComplete')
         
         
+        from operator import itemgetter 
+        data_ = EXCLUDE(np.load('/content/videos/Source/INFO.npy', allow_pickle = True).item()['DATA'][-1], A = 0, N = 0)
         
-        DATA_info = np.load('/content/videos/Source/INFO.npy', allow_pickle = True).item()['DATA'][-1]
+        DATA_info = data_#sorted(data_, key=itemgetter('LEN','AREA'))
         img_size = 84
         
         i = 0
-        data_imgs = [cv2.cvtColor(np.array(DATA_info[i]['IMG'][0]), cv2.COLOR_BGR2RGB) for i in DATA_info.keys()]#glob.glob('/data/hhh/data_dst/aligned/*')[:10]
-        n_data_imgs = [len(DATA_info[i]['IMG']) for i in DATA_info.keys()]
+        
+        n_data_imgs = ([len(DATA_info[i]['IMG']) for i in DATA_info.keys()])
+        data_imgs = [[cv2.cvtColor(np.array(DATA_info[i]['IMG'][num_//2]), cv2.COLOR_BGR2RGB), num_] for num_, i in sorted(zip(n_data_imgs, DATA_info.keys()),  reverse=True)]#glob.glob('/data/hhh/data_dst/aligned/*')[:10]
         print (len(data_imgs))
         n_rows = 3
 
-        frm_src  = ['data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png',cv2.resize(i, (img_size,img_size)))[1]).decode()) for i in data_imgs]
+        frm_src  = ['data:image/png;base64,{}'.format(base64.b64encode(cv2.imencode('.png',cv2.resize(i[0], (img_size,img_size)))[1]).decode()) for i in data_imgs]
 
         lvc = []
         for i in range(len(frm_src)//n_rows):
@@ -2167,7 +2221,7 @@ def update(intv):
 
 
         lvc = html.Div([html.Div(lvc, style = {'width':str(img_size*n_rows)+'px'}),html.Div(lvc_, style = {'width':str(img_size*len(remaining_srcs))+'px'}),
-        html.Div([dbc.Tooltip(html.Div(str(n_data_imgs[i])+' images', style  = {'font-size':'12px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
+        html.Div([dbc.Tooltip(html.Div(str(data_imgs[i][1])+' images', style  = {'font-size':'12px'}), target = 'src_imgs_tooltip_div-'+str(i)) for i in range(len(frm_src))])])
 
 
 
