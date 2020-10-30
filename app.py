@@ -2188,10 +2188,10 @@ def update(intv):
         
         
         from operator import itemgetter 
-        data_ = EXCLUDE(np.load('/content/videos/Source/INFO.npy', allow_pickle = True).item()['DATA'][-1], A = 0, N = 0)
+        data_ = EXCLUDE(np.load('/content/videos/Source/INFO.npy', allow_pickle = True).item()['DATA'][-1], A = 1, N = 10)
         
         DATA_info = data_#sorted(data_, key=itemgetter('LEN','AREA'))
-        img_size = 84
+        img_size = 64
         
         i = 0
         
@@ -2229,13 +2229,13 @@ def update(intv):
         
         return True, lvc
         
-    elif os.path.isfile('/tmp/InfoExit'):
+    #elif os.path.isfile('/tmp/InfoExit'):
     
-        return False, ''
+     #   return False, ''
         
-    else:
+    #else:
     
-        return dash.no_update, dash.no_update
+   #     return True, '' #dash.no_update, dash.no_update
 @app.callback(Output('main_panel','style'), [Input('power_id', 'n_clicks')])    
 def update(n):
     if n:
