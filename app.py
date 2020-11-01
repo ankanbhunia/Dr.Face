@@ -1719,7 +1719,7 @@ upload= loading([(dcc.Upload([
         (html.Div(id = 'uploading'))])
         
         
-Youtube = loading([dbc.InputGroup(
+Youtube = ([dbc.InputGroup(
             [dbc.Input(bs_size="sm", id = 'utube-url'), dbc.Button("Submit", color="primary", id = 'utube-button', size="sm")],
             size="sm",
         ),
@@ -1749,7 +1749,7 @@ controls = dbc.Jumbotron(
     
         html.Hr(className="my-2"),
         dbc.Toast(upload, id="toggle-add-upload",header="Upload your Video",is_open=False,icon="primary",dismissable=True, style={"maxWidth": "500px"}),
-        dbc.Toast(Youtube, id="toggle-add-utube",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
+        dbc.Toast(loading(Youtube), id="toggle-add-utube",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
         dbc.Toast(record, id="toggle-add-record",header="Record your own Video",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
         #html.Hr(className="my-2"),
         #html.P("You haven\'t added any videos. Let\'s add one. You have the option to add video by Upload, Youtube or Webcam", id = 'output_text')
@@ -1777,10 +1777,10 @@ upload_= loading([(dcc.Upload([
         
         
         
-Youtube_ = loading([dbc.InputGroup(
+Youtube_ = ([(dbc.InputGroup(
             [dbc.Input(bs_size="sm", id = 'utube-url_2'), dbc.Button("Submit", color="primary", id = 'utube-button_2', size="sm" )],
             size="sm",
-        ),
+        )),
     
     (html.Div(id = 'youtube-display_2'))
 ])    
@@ -1804,7 +1804,7 @@ controls_ = dbc.Jumbotron(
             
         html.Hr(className="my-2"),
         dbc.Toast(upload_, id="toggle-add-upload_2",header="Upload your Video",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
-        dbc.Toast(Youtube_, id="toggle-add-utube_2",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
+        dbc.Toast(loading(Youtube_), id="toggle-add-utube_2",header="Download Video from Youtube",is_open=False,icon="primary",dismissable=True,  style={"maxWidth": "500px"}),
         #dbc.Toast(record, id="toggle-add-record_2",header="Record your own Video",is_open=False,icon="primary",dismissable=False),
         #html.Hr(className="my-2"),
         #html.P("You haven\'t added any videos here. Let\'s add one. You have the option to add video by Upload, Youtube or Webcam", id = 'output_text_2')
@@ -2591,11 +2591,13 @@ def update_youtube(n, url):
   
         
         return html.Div( 
-            [html.Hr(), html.Img(id = 'playback_utube', style={
-            'width': '100%',
-            'height': '100%','padding-left':'8.5%', 'padding-right':'8.5%'
-            }, src = 'data:image/png;base64,{}'.format(frame.decode())), dcc.RangeSlider(
-                id='my-range-slider_utube',
+            [html.Hr(), dash_player.DashPlayer(
+    id='playback_utube',
+    #url='http://media.w3.org/2010/05/bunny/movie.mp4',
+    url = url,
+    controls=False, playing = False,  width='100%', 
+), dcc.RangeSlider(
+                id='my-range-slider_utube', #tooltip = {'always_visible':True, 'placement' :'bottom'},
                 min=0,
                 max=1000,
                 step=1,
@@ -2681,14 +2683,14 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
   else:
     return [s2, s3, s4, dash.no_update]
 @app.callback(
-    [Output('playback_utube', 'src'),
+    [Output('playback_utube', 'seekTo'),
       #Output("Youtube-addclick", "n_clicks"), 
       Output("temp1", "children"),
       Output("n_utube", "children"),
       Output("my-range-slider_utube", "marks")],
     [Input('my-range-slider_utube', 'value'), 
       Input('crop_button_utube', 'n_clicks') 
-      ],[State('playback_utube', 'src')])
+      ],[State('playback_utube', 'seekTo')])
 def upload_playback_utube(rang, n_clicks, s):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
@@ -2748,19 +2750,19 @@ def upload_playback_utube(rang, n_clicks, s):
         slider_prev_instance = rang
         #cap.set(1, frame_number)
         #res, frame = cap.read()
-        frame = VID.get_frame(time_n)
-        frame = imutils.resize(frame, height=64)
+        #frame = VID.get_frame(time_n)
+        #frame = imutils.resize(frame, height=64)
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
         #frame = cv2.resize(frame, (100, 70),interpolation=cv2.INTER_CUBIC)
         ############print (res)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ret, frame = cv2.imencode('.png', frame)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #ret, frame = cv2.imencode('.png', frame)
         #frame = cv2.resize(frame, (128,128))
         length = end_time - str_time
-        frame = base64.b64encode(frame)
+        #frame = base64.b64encode(frame)
         
-        return ['data:image/png;base64,{}'.format(frame.decode()),'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [time_n,'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
 @app.callback(
     [Output('playback', 'src'), 
       #Output("Upload-addclick", "n_clicks"), 
@@ -3044,10 +3046,12 @@ def update_youtube(n, url):
         frame = base64.b64encode(frame)
         
         return html.Div( 
-            [html.Hr(), html.Img(id = 'playback_utube_2', style={
-            'width': '100%',
-            'height': '100%','padding-left':'8.5%', 'padding-right':'8.5%'
-            }, src = 'data:image/png;base64,{}'.format(frame.decode())), dcc.RangeSlider(
+            [html.Hr(), dash_player.DashPlayer(
+    id='playback_utube_2',
+    #url='http://media.w3.org/2010/05/bunny/movie.mp4',
+    url = url,
+    controls=False, playing = False,  width='100%', 
+), dcc.RangeSlider(
                 id='my-range-slider_utube_2',
                 min=0,
                 max=1000,
@@ -3056,14 +3060,14 @@ def update_youtube(n, url):
                                                                                           color="light", size="sm",  style = {'margin-top': '-20px', 'font-weight': 'bold'}), style = {'text-align':'center'})])
     
 @app.callback(
-    [Output('playback_utube_2', 'src'),
+    [Output('playback_utube_2', 'seekTo'),
       #Output("Youtube-addclick_2", "n_clicks"), 
       Output("temp1_2", "children"),
       Output("n_utube_2", "children"),
       Output("my-range-slider_utube_2", "marks")],
     [Input('my-range-slider_utube_2', 'value'), 
       Input('crop_button_utube_2', 'n_clicks')]
-      ,[State('playback_utube_2', 'src')])
+      ,[State('playback_utube_2', 'seekTo')])
 def upload_playback_utube(rang, n_clicks, s):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)
@@ -3111,18 +3115,18 @@ def upload_playback_utube(rang, n_clicks, s):
             time_n = int(T*rang[0]/1000)
         slider_prev_instance2 = rang
         
-        frame = VID.get_frame(time_n)
-        frame = imutils.resize(frame, height=64)
+        #frame = VID.get_frame(time_n)
+        #frame = imutils.resize(frame, height=64)
         str_time = T*rang[0]/1000
         end_time = T*rang[1]/1000
         
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ret, frame = cv2.imencode('.png', frame)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #ret, frame = cv2.imencode('.png', frame)
         #frame = cv2.resize(frame, (128,128))
         length = end_time - str_time
-        frame = base64.b64encode(frame)
+        #frame = base64.b64encode(frame)
         
-        return ['data:image/png;base64,{}'.format(frame.decode()), 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [time_n, 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
 @app.callback(
     [Output('playback_2', 'src'), 
       #Output("Upload-addclick_2", "n_clicks"), 
