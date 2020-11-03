@@ -2581,12 +2581,12 @@ def update_youtube(n, url):
         VID = VideoFileClip('videos/Source/Youtube/temp.mp4')
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         src_vids.append(VID)
-        frame = VID.get_frame(0)
-        frame = imutils.resize(frame, height=64)
+        #frame = VID.get_frame(0)
+        #frame = imutils.resize(frame, height=64)
         
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ret, frame = cv2.imencode('.png', frame)
-        frame = base64.b64encode(frame)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #ret, frame = cv2.imencode('.png', frame)
+        #frame = base64.b64encode(frame)
         
   
         
@@ -2595,7 +2595,7 @@ def update_youtube(n, url):
     id='playback_utube',
     #url='http://media.w3.org/2010/05/bunny/movie.mp4',
     url = url,
-    controls=False, playing = False,  width='100%', 
+    controls=True, playing = False,  width='100%', 
 ), dcc.RangeSlider(
                 id='my-range-slider_utube', #tooltip = {'always_visible':True, 'placement' :'bottom'},
                 min=0,
@@ -3038,19 +3038,19 @@ def update_youtube(n, url):
         #VID = VID.resize((int((VID.aspect_ratio*HEIGHT)//2)*2, HEIGHT))
         tar_vids.append(VID)
         
-        frame = VID.get_frame(0)
-        frame = imutils.resize(frame, height=64)
+        #frame = VID.get_frame(0)
+        #frame = imutils.resize(frame, height=64)
         
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        ret, frame = cv2.imencode('.png', frame)
-        frame = base64.b64encode(frame)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #ret, frame = cv2.imencode('.png', frame)
+        #frame = base64.b64encode(frame)
         
         return html.Div( 
             [html.Hr(), dash_player.DashPlayer(
     id='playback_utube_2',
     #url='http://media.w3.org/2010/05/bunny/movie.mp4',
     url = url,
-    controls=False, playing = False,  width='100%', 
+    controls=True, playing = False,  width='100%', 
 ), dcc.RangeSlider(
                 id='my-range-slider_utube_2',
                 min=0,
@@ -3068,6 +3068,7 @@ def update_youtube(n, url):
     [Input('my-range-slider_utube_2', 'value'), 
       Input('crop_button_utube_2', 'n_clicks')]
       ,[State('playback_utube_2', 'seekTo')])
+      
 def upload_playback_utube(rang, n_clicks, s):
     ###print'######################################################')
     ##########print (dash.callback_context.triggered[0]['prop_id'], currentframe().f_lineno)

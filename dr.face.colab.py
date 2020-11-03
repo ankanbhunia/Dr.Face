@@ -8,10 +8,11 @@ import argparse
 parser = argparse.ArgumentParser(description='Dr.Face Options')
 
 
+parser.add_argument('--ngrok',action='store_true',
+                   help='Use ngrok as tunnel medium')
+
 parser.add_argument('--token', type=str,
                    help='Enter ngrok Authtoken from https://dashboard.ngrok.com/auth/your-authtoken ')
-
-                    
 parser.add_argument('--path', type=str,
                     help='Specify drive path')
                     
@@ -24,7 +25,9 @@ parser.add_argument('--debug', action='store_true',
 
 args = parser.parse_args()
 
-xxx = args.token
+xxx = args.ngrok
+
+token_ = args.token
 drive_path = args.path
 notmount = args.no_drive
 debug = args.debug
@@ -76,10 +79,12 @@ if xxx:
   try:
 
     get_ipython().system_raw("pip3 install pyngrok")
-    get_ipython().system_raw("ngrok authtoken " + xxx)
+    #get_ipython().system_raw("ngrok authtoken " + xxx)
     from pyngrok import ngrok
+    if token_:
+      ngrok.set_auth_token(token_)
     ngrok.kill()
-    print("Project URL: "+ngrok.connect(port = '4000'))
+    print("Project URL: "+ngrok.connect(4000).public_url)
 
   except:
 
