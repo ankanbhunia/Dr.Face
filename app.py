@@ -2687,7 +2687,8 @@ def update_details(t1, t2, n, n1, s2, s3, s4):
       #Output("Youtube-addclick", "n_clicks"), 
       Output("temp1", "children"),
       Output("n_utube", "children"),
-      Output("my-range-slider_utube", "marks")],
+      Output("my-range-slider_utube", "marks"),
+      Output('playback_utube', 'playing')],
     [Input('my-range-slider_utube', 'value'), 
       Input('crop_button_utube', 'n_clicks') 
       ],[State('playback_utube', 'seekTo')])
@@ -2733,7 +2734,7 @@ def upload_playback_utube(rang, n_clicks, s):
         length = VID.duration
         ###########print ('jkbdasflsfkafbkasbkfasaskasksbkabkaj' )
         ###########print (length)
-        return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}, False]
         
     else:
         
@@ -2762,7 +2763,7 @@ def upload_playback_utube(rang, n_clicks, s):
         length = end_time - str_time
         #frame = base64.b64encode(frame)
         
-        return [time_n,'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [time_n,'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}, dash.no_update]
 @app.callback(
     [Output('playback', 'src'), 
       #Output("Upload-addclick", "n_clicks"), 
@@ -3064,7 +3065,8 @@ def update_youtube(n, url):
       #Output("Youtube-addclick_2", "n_clicks"), 
       Output("temp1_2", "children"),
       Output("n_utube_2", "children"),
-      Output("my-range-slider_utube_2", "marks")],
+      Output("my-range-slider_utube_2", "marks"),
+      Output('playback_utube_2', 'playing')],
     [Input('my-range-slider_utube_2', 'value'), 
       Input('crop_button_utube_2', 'n_clicks')]
       ,[State('playback_utube_2', 'seekTo')])
@@ -3100,7 +3102,7 @@ def upload_playback_utube(rang, n_clicks, s):
         output = 'You have added total ' + str(video_index2()) + ' video(s). You can add more videos' 
         length = VID.duration
         
-        return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [s, 'True', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}, False]
         
     else:
         
@@ -3127,7 +3129,7 @@ def upload_playback_utube(rang, n_clicks, s):
         length = end_time - str_time
         #frame = base64.b64encode(frame)
         
-        return [time_n, 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}]
+        return [time_n, 'False', str(int((length))) + 's', {0: get_sec2time(str_time), 1000: get_sec2time(end_time)}, dash.no_update]
 @app.callback(
     [Output('playback_2', 'src'), 
       #Output("Upload-addclick_2", "n_clicks"), 

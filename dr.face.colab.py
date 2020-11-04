@@ -75,12 +75,9 @@ if not os.path.isfile('/tmp/done'):
 clear_output()
 
 
-print ("[GPU Device]="+gpu)
+print ("[GPU Device]="+gpu, end= ' | ')
 
 
-print ("""
-
-""")
 
 if xxx:
 
@@ -104,9 +101,6 @@ else:
   print("Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
 
 
-print("""
-                                                                                                                                                               
-""")
 
 get_ipython().system_raw("fuser -k 4000/tcp")
 
@@ -115,11 +109,21 @@ if drive_path:
     if not debug:
       get_ipython().system_raw("Library/bin/python app.py "+drive_path)
     else:
+          
+      print("""
+                                                                                                                                                                    
+      """)
       G = get_ipython().getoutput("Library/bin/python app.py "+drive_path)
       
 else:
 
     if not debug:
       get_ipython().system_raw("Library/bin/python app.py")
+      
     else:
+
+          
+      print("""
+                                                                                                                                                                    
+      """)
       G = get_ipython().getoutput("Library/bin/python app.py")
