@@ -61,7 +61,15 @@ if not os.path.isfile('/tmp/done'):
      
 
   print ('['+gpu+']'+' Please wait for few minutes... ')
-  get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git drface; cd drface && gdown --id 1-7XxOStSUCRfjtgJqzO57Z2Ku2TpmBGa && tar -xvf drfacelib.tar.gz && rm drfacelib.tar.gz; touch /tmp/done')
+  
+  print ('\n[1/3] Downloading repository from Github')
+  get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git foo; mv foo/* foo/.git* .; rmdir foo')
+  print ('\n[2/3] Downloading python environment')
+  O_ = get_ipython().getoutput('gdown --id 1-7XxOStSUCRfjtgJqzO57Z2Ku2TpmBGa')
+  print ('\n[3/3] Setting up environment for Dr.Face')
+  get_ipython().system_raw('tar -xvf drfacelib.tar.gz; rm drfacelib.tar.gz; touch /tmp/done')
+  
+  #get_ipython().system_raw('git clone https://github.com/ankanbhunia/Dr.Face.git foo; mv foo/* foo/.git* .; rmdir foo; gdown --id 1-7XxOStSUCRfjtgJqzO57Z2Ku2TpmBGa; tar -xvf drfacelib.tar.gz; rm drfacelib.tar.gz; touch /tmp/done')
   get_ipython().system_raw('sudo apt-get install -y xattr')
 
 clear_output()
