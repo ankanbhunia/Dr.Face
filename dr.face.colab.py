@@ -75,8 +75,6 @@ if not os.path.isfile('/tmp/done'):
 clear_output()
 
 
-print ("[GPU Device]="+gpu, end= ' | ')
-
 
 
 if xxx:
@@ -89,16 +87,16 @@ if xxx:
     if token_:
       ngrok.set_auth_token(token_)
     ngrok.kill()
-    print("Project URL: "+ngrok.connect(4000).public_url)
+    print("[GPU Device]="+gpu, end= ' | '+"Project URL: "+ngrok.connect(4000).public_url)
 
   except:
 
     print ('The ngrok token is invalid')
-    print("Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
+    print("[GPU Device]="+gpu, end= ' | '+"Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
 
 else:
 
-  print("Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
+  print("[GPU Device]="+gpu, end= ' | '+"Project URL: "+eval_js("google.colab.kernel.proxyPort(%d)"% (4000)))
 
 
 
