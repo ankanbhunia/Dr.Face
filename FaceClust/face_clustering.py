@@ -60,7 +60,7 @@ def Get_face_clustered_labels(faces_folder_path):
             
             descriptors.append(face_descriptor)
             
-            images.append((img, shape))
+           
             
             FACE_PATHS.append(f)
 
